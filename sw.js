@@ -1,7 +1,7 @@
-const CACHE_NAME = 'edunext-v3';
+const CACHE_NAME = 'edunext-v4'; // Changed version to force update
 const ASSETS = [
-  '/',
-  '/index.html',
+  './',             // Changed from '/' to './'
+  './index.html',   // Changed from '/index.html' to './index.html'
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
