@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KARMIK HRMS - Cloud</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { slate: { 850: '#1e293b' } },
+                    boxShadow: {
+                        'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+                        'card': '0 0 0 1px rgba(226, 232, 240, 1), 0 2px 4px rgba(0, 0, 0, 0.02)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
+        .glass-header { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border-bottom: 1px solid #e2e8f0; }
+        .card-premium { background: white; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); border: 1px solid #e2e8f0; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .badge-pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); } }
+        @media print {
+            body { background: white !important; }
+            .card-premium, .glass-header, aside { border: none !important; box-shadow: none !important; }
+            .no-print, button, #mobile-overlay, .pdf-controls { display: none !important; }
+            #content-area { padding: 0; }
+            table { border: 1px solid #ccc; width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ccc; padding: 8px; font-size: 10pt; }
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col">
+
+    <div id="loading-screen" class="fixed inset-0 bg-white z-[100] flex flex-col justify-center items-center">
+        <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+        <h2 class="text-slate-800 font-bold text-lg">Connecting to Cloud...</h2>
+        <p class="text-slate-400 text-sm">Please wait while we fetch your data</p>
+    </div>
+
+    <div id="login-screen" class="hidden flex h-full w-full justify-center items-center bg-slate-50 absolute z-50">
+        <div class="card-premium p-10 rounded-2xl shadow-xl w-96 relative z-10">
+            <div class="text-center mb-8">
+                <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-600/20">
+                    <i class="fa-solid fa-cube text-white text-xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">KARMIK HRMS</h1>
+                <p class="text-slate-500 text-xs font-medium mt-2 uppercase tracking-wide">by IRA Education & IT Solutions</p>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="email" placeholder="Email or Login ID" class="w-full p-3 bg-white border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
+                <input type="password" id="password" placeholder="Password" class="w-full p-3 bg-white border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
+                <button onclick="Auth.login()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-semibold shadow-md shadow-indigo-600/10 transition-all transform active:scale-[0.98]">Sign In</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="force-change-modal" class="hidden fixed inset-0 bg-slate-900/90 z-[60] flex justify-center items-center p-4">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-96 text-center">
+            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-lock text-xl"></i></div>
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Security Update Required</h2>
+            <p class="text-sm text-slate-500 mb-6">You are using a default password. Set a new one to continue.</p>
+            <form onsubmit="Auth.forceChange(event)" class="space-y-4">
+                <input type="password" id="fcNewPass" placeholder="New Password" class="w-full p-3 border rounded-lg outline-none focus:border-indigo-500" required>
+                <input type="password" id="fcConfirmPass" placeholder="Confirm Password" class="w-full p-3 border rounded-lg outline-none focus:border-indigo-500" required>
+                <button class="w-full bg-red-600 text-white p-3 rounded-lg font-bold hover:bg-red-700 transition">Update Password</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden flex h-screen w-full relative bg-slate-50">
+        <div id="mobile-overlay" onclick="UI.toggleSidebar()" class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 hidden lg:hidden transition-opacity"></div>
+
+        <aside id="sidebar" class="w-64 border-r border-slate-200 bg-white flex flex-col z-50 fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-300 lg:translate-x-0 lg:static">
+            <div class="p-6 h-16 flex items-center justify-between border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-7 h-7 bg-indigo-600 rounded flex items-center justify-center text-white text-xs"><i class="fa-solid fa-cube"></i></div>
+                    <span class="font-bold text-slate-800 tracking-tight">KARMIK</span>
+                </div>
+                <button onclick="UI.toggleSidebar()" class="lg:hidden text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <nav id="sidebar-nav" class="flex-1 p-4 space-y-1 overflow-y-auto"></nav>
+            <div class="p-4 border-t border-slate-100 bg-slate-50/50">
+                
+                <div id="admin-tools" class="hidden space-y-1 mb-4">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">System</p>
+                    <button onclick="DB.exportData()" class="w-full text-left text-xs text-emerald-600 hover:bg-emerald-50 p-2 rounded transition font-medium"><i class="fa-solid fa-download mr-2"></i> Backup Data</button>
+                    <button onclick="document.getElementById('restoreFile').click()" class="w-full text-left text-xs text-blue-600 hover:bg-blue-50 p-2 rounded transition font-medium"><i class="fa-solid fa-upload mr-2"></i> Restore Data</button>
+                    <input type="file" id="restoreFile" class="hidden" onchange="DB.importData(this)">
+                    <button onclick="UI.modal('admin-settings')" class="w-full text-left text-xs text-slate-600 hover:bg-slate-100 p-2 rounded transition font-medium"><i class="fa-solid fa-gear mr-2"></i> Admin Settings</button>
+                </div>
+
+                <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm transition cursor-pointer group">
+                    <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs group-hover:bg-indigo-50 group-hover:text-indigo-600"><span id="user-initial">A</span></div>
+                    <div class="overflow-hidden flex-1">
+                        <p id="user-name" class="text-xs font-bold text-slate-700 truncate">User</p>
+                        <button onclick="Auth.logout()" class="text-[10px] text-slate-400 hover:text-rose-500">Sign Out</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-50">
+            <header class="glass-header h-16 px-6 flex justify-between items-center sticky top-0 z-30">
+                <div class="flex items-center gap-4">
+                    <button onclick="UI.toggleSidebar()" class="lg:hidden text-slate-500 hover:text-slate-800"><i class="fa-solid fa-bars text-lg"></i></button>
+                    <h2 id="page-title" class="text-lg font-bold text-slate-800 tracking-tight">Dashboard</h2>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="search-container" class="hidden lg:block relative">
+                        <i class="fa-solid fa-search absolute left-3 top-2.5 text-slate-400"></i>
+                        <input type="text" id="searchInput" onkeyup="UI.filterEmployees()" placeholder="Search..." class="pl-9 pr-4 py-2 bg-slate-100 border-none rounded-full text-sm text-slate-700 focus:bg-white focus:ring-2 focus:ring-indigo-100 w-64 transition-all">
+                    </div>
+                    <span id="current-date" class="hidden sm:block text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full"></span>
+                </div>
+            </header>
+            <div id="content-area" class="flex-1 overflow-y-auto p-6 lg:p-8 relative pb-20 fade-in"></div>
+            <footer class="border-t border-slate-200 bg-white text-slate-400 text-center py-3 text-[10px] w-full z-20">
+                Version 3.1 (Cloud + Admin Ops) | © 2026 IRA Education
+            </footer>
+        </main>
+    </div>
+
+    <div id="modal" class="hidden fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-lg transform transition-all scale-100 flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 id="modal-title" class="font-bold text-lg text-slate-800">Title</h3>
+                <button onclick="UI.closeModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="modal-content" class="p-6 overflow-y-auto custom-scrollbar text-slate-600"></div>
+        </div>
+    </div>
+
+    <div id="pdf-container" class="fixed top-0 left-0 w-full h-full bg-white z-[100] p-8 hidden overflow-auto text-black">
+        <div id="pdf-content"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, deleteDoc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // ==========================================
+        // CONFIG: PASTE YOUR FIREBASE CONFIG HERE
+        // ==========================================
+        const firebaseConfig = {
+         apiKey: "AIzaSyDSVmvZlaIt8lHeubHmebO_hJwR_BupEfY",
+  authDomain: "hrms-59a38.firebaseapp.com",
+  projectId: "hrms-59a38",
+  storageBucket: "hrms-59a38.firebasestorage.app",
+  messagingSenderId: "31420433896",
+  appId: "1:31420433896:web:1a912491a8b140c051905d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Global Variables
+        let _users = [], _payments = [], _leaves = [], _requests = [], _expenses = [], _notices = [];
+        let _userDocs = {}, _payDocs = {}, _leaveDocs = {}, _reqDocs = {}, _expDocs = {}, _noteDocs = {};
+
+        // Expose DB functions globally
+        window.DB = {
+            async init() {
+                try {
+                    const [uSnap, pSnap, lSnap, rSnap, eSnap, nSnap] = await Promise.all([
+                        getDocs(collection(db, "users")),
+                        getDocs(collection(db, "payments")),
+                        getDocs(collection(db, "leaves")),
+                        getDocs(collection(db, "requests")),
+                        getDocs(collection(db, "expenses")),
+                        getDocs(collection(db, "notices"))
+                    ]);
+
+                    _users = []; uSnap.forEach(d => { const data = d.data(); _users.push(data); _userDocs[data.id] = d.id; });
+                    _payments = []; pSnap.forEach(d => { const data = d.data(); _payments.push(data); _payDocs[data.id] = d.id; });
+                    _leaves = []; lSnap.forEach(d => { const data = d.data(); _leaves.push(data); _leaveDocs[data.id] = d.id; });
+                    _requests = []; rSnap.forEach(d => { const data = d.data(); _requests.push(data); _reqDocs[data.id] = d.id; });
+                    _expenses = []; eSnap.forEach(d => { const data = d.data(); _expenses.push(data); _expDocs[data.id] = d.id; });
+                    _notices = []; nSnap.forEach(d => { const data = d.data(); _notices.push(data); _noteDocs[data.id] = d.id; });
+
+                    if (_users.length === 0) {
+                        const defaultPassHash = await Sec.hash("admin123");
+                        const admin = { 
+                            id: 1715001, name: "System Admin", email: "admin@hr.com", password: defaultPassHash, 
+                            role: "admin", designation: "HR Manager", salary: 0, mobile: "9999999999", 
+                            address: "Office HQ", joinDate: "2023-01-01", openingBalance: 0, status: "Active", isDefaultPass: true
+                        };
+                        const docRef = await addDoc(collection(db, "users"), admin);
+                        _users.push(admin);
+                        _userDocs[admin.id] = docRef.id;
+                    }
+                    
+                    document.getElementById('loading-screen').classList.add('hidden');
+                    document.getElementById('login-screen').classList.remove('hidden');
+
+                } catch (error) {
+                    console.error("DB Init Error:", error);
+                    alert("Failed to connect to Database. Check Config.");
+                }
+            },
+
+            // --- Users ---
+            getUsers: () => _users,
+            saveUser: async (user) => { 
+                _users.push(user); 
+                const ref = await addDoc(collection(db, "users"), user);
+                _userDocs[user.id] = ref.id;
+            },
+            updateUser: async (user) => { 
+                const idx = _users.findIndex(x => x.id === user.id);
+                if(idx > -1) { 
+                    _users[idx] = user; 
+                    const docId = _userDocs[user.id];
+                    if(docId) await updateDoc(doc(db, "users", docId), user);
+                }
+            },
+            deleteUser: async (id) => { 
+                _users = _users.filter(x => x.id !== id);
+                const docId = _userDocs[id];
+                if(docId) await deleteDoc(doc(db, "users", docId));
+            },
+
+            // --- Payments ---
+            getPayments: (id) => _payments.filter(p => p.empId === id).sort((a,b) => new Date(b.date)-new Date(a.date)),
+            addPayment: async (p) => { 
+                _payments.push(p); 
+                const ref = await addDoc(collection(db, "payments"), p);
+                _payDocs[p.id] = ref.id;
+            },
+            updatePayment: async (p) => {
+                const idx = _payments.findIndex(x => x.id === p.id);
+                if(idx > -1) _payments[idx] = p;
+                const docId = _payDocs[p.id];
+                if(docId) await updateDoc(doc(db, "payments", docId), p);
+            },
+            deletePayment: async (id) => { 
+                _payments = _payments.filter(x => x.id !== id);
+                const docId = _payDocs[id];
+                if(docId) await deleteDoc(doc(db, "payments", docId));
+            },
+
+            // --- Leaves ---
+            getLeaves: (id) => _leaves.filter(l => l.empId === id).sort((a,b) => new Date(b.startDate)-new Date(a.startDate)),
+            addLeave: async (l) => { 
+                _leaves.push(l); 
+                const ref = await addDoc(collection(db, "leaves"), l);
+                _leaveDocs[l.id] = ref.id;
+            },
+            deleteLeave: async (id) => { 
+                _leaves = _leaves.filter(x => x.id !== id);
+                const docId = _leaveDocs[id];
+                if(docId) await deleteDoc(doc(db, "leaves", docId));
+            },
+
+            // --- Requests ---
+            getRequests: () => _requests,
+            addRequest: async (r) => { 
+                _requests.push(r); 
+                const ref = await addDoc(collection(db, "requests"), r);
+                _reqDocs[r.id] = ref.id;
+            },
+            updateRequest: async (id, status) => { 
+                const r = _requests.find(x => x.id === id);
+                if(r) {
+                    r.status = status;
+                    const docId = _reqDocs[id];
+                    if(docId) await updateDoc(doc(db, "requests", docId), { status });
+                }
+                return r;
+            },
+
+            // --- Expenses ---
+            getExpenses: () => _expenses,
+            addExpense: async (e) => { 
+                _expenses.push(e); 
+                const ref = await addDoc(collection(db, "expenses"), e);
+                _expDocs[e.id] = ref.id;
+            },
+            updateExpense: async (id, status) => { 
+                const e = _expenses.find(x => x.id === id);
+                if(e) {
+                    e.status = status;
+                    const docId = _expDocs[id];
+                    if(docId) await updateDoc(doc(db, "expenses", docId), { status });
+                }
+            },
+
+            // --- Notices ---
+            getNotices: () => _notices.sort((a,b) => b.id - a.id),
+            addNotice: async (text) => {
+                const n = { id: Date.now(), text, date: new Date().toLocaleDateString() };
+                _notices.unshift(n);
+                const ref = await addDoc(collection(db, "notices"), n);
+                _noteDocs[n.id] = ref.id;
+            },
+            deleteNotice: async (id) => {
+                 _notices = _notices.filter(x => x.id !== id);
+                 const docId = _noteDocs[id];
+                 if(docId) await deleteDoc(doc(db, "notices", docId));
+            },
+
+            // --- NEW: IMPORT DATA LOGIC ---
+            importData: (input) => {
+                const f = input.files[0]; if(!f) return;
+                if(!confirm("WARNING: This will upload records from the file to the Cloud Database. Continue?")) return;
+
+                document.getElementById('loading-screen').classList.remove('hidden');
+
+                const r = new FileReader();
+                r.onload = async (e) => {
+                    try {
+                        const d = JSON.parse(e.target.result);
+                        const parse = (x) => typeof x === 'string' ? JSON.parse(x) : (x || []);
+                        const uploadBatch = async (colName, data) => {
+                            const arr = parse(data);
+                            if(arr.length > 0) {
+                                const promises = arr.map(item => addDoc(collection(db, colName), item));
+                                await Promise.all(promises);
+                            }
+                        };
+                        await uploadBatch("users", d.u);
+                        await uploadBatch("payments", d.p);
+                        await uploadBatch("leaves", d.l);
+                        await uploadBatch("requests", d.r);
+                        await uploadBatch("expenses", d.e);
+                        await uploadBatch("notices", d.n);
+                        alert("Data Restored Successfully!");
+                        location.reload();
+                    } catch(err) {
+                        console.error("Import Error:", err);
+                        alert("Import Failed.");
+                        document.getElementById('loading-screen').classList.add('hidden');
+                    }
+                };
+                r.readAsText(f);
+            },
+
+            calcCycles: (joinDate) => {
+                if(!joinDate) return 0;
+                const p = joinDate.split('-'); const jY=parseInt(p[0]), jM=parseInt(p[1])-1, jD=parseInt(p[2]);
+                const n = new Date();
+                let m = (n.getFullYear()-jY)*12 + (n.getMonth()-jM);
+                if(n.getDate() < jD) m--;
+                return Math.max(0, m);
+            },
+            calcDeductions: (id, salary) => {
+                const leaves = _leaves.filter(l => l.empId === id && l.type === 'LWP');
+                const days = leaves.reduce((sum, l) => sum + parseInt(l.days), 0);
+                return Math.round(days * (salary/30));
+            },
+            nextCredit: (joinDate) => {
+                if(!joinDate) return '-';
+                const d = parseInt(joinDate.split('-')[2]); const n = new Date();
+                let next = new Date(n.getFullYear(), n.getMonth(), d);
+                if(n.getDate() >= d) next.setMonth(next.getMonth()+1);
+                return next.toLocaleDateString('en-IN', {day:'numeric', month:'short'});
+            },
+            stdDate: (d) => {
+                if(!d) return new Date().toISOString().split('T')[0];
+                d=d.trim(); if(d.match(/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/)) { const p=d.split(/[-/]/); return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; } return d;
+            },
+            exportData: () => {
+                const data = { u: _users, p: _payments, l: _leaves, r: _requests, e: _expenses, n: _notices };
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)],{type:"application/json"})); a.download = `HR_Cloud_Backup_${new Date().toISOString().split('T')[0]}.json`; a.click();
+            },
+            importCSV: (input, id) => {
+                const f = input.files[0]; if(!f) return; const r = new FileReader();
+                r.onload = (e) => { const rows = e.target.result.split("\n"); let c=0;
+                    rows.forEach((row, i) => { const cols = row.split(","); if(cols.length>=2 && cols[0].match(/\d/)) {
+                        const amt = parseInt(cols[1]); if(!isNaN(amt)) {
+                            DB.addPayment({id:Date.now()+i, empId:id, date:DB.stdDate(cols[0]), amount:amt, mode:cols[2]?.trim()||'CSV', remarks:cols[3]?.trim()||'Import'}); c++;
+                        }}}); alert(`Imported ${c} records.`); UI.renderPage('details', id);
+                }; r.readAsText(f);
+            },
+            genPDF: (id) => {
+                if(typeof html2pdf === 'undefined') return alert("PDF Lib missing.");
+                const u = _users.find(x=>x.id===id);
+                const p = _payments.filter(pay => pay.empId === id);
+                const f = document.getElementById('pdfFrom').value;
+                const t = document.getElementById('pdfTo').value;
+                if(!f || !t) return alert("Select Dates.");
+                
+                const fT = new Date(f).setHours(0,0,0,0); const tT = new Date(t).setHours(23,59,59,999);
+                const fil = p.filter(x => { const d = new Date(x.date).getTime(); return d>=fT && d<=tT; });
+                const tot = fil.reduce((s,x)=>s+x.amount,0);
+
+                const div = document.getElementById('pdf-content');
+                div.innerHTML = `
+                    <div class="p-8 bg-white text-black font-sans border">
+                        <div class="text-center border-b pb-4 mb-6">
+                            <h1 class="text-2xl font-bold uppercase text-gray-900">Payment Statement</h1>
+                            <p class="text-sm text-gray-500">KARMIK HRMS | IRA Education</p>
+                        </div>
+                        <div class="flex justify-between text-sm mb-6">
+                            <div><strong class="text-lg">${u.name}</strong><br>${u.designation}<br>${u.mobile}</div>
+                            <div class="text-right"><strong class="uppercase text-gray-500 text-xs">Period</strong><br><strong>${f}</strong> to <strong>${t}</strong></div>
+                        </div>
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead><tr class="bg-gray-100 border-b border-gray-300"><th class="p-2 border border-gray-300">Date</th><th class="p-2 border border-gray-300">Mode</th><th class="p-2 border border-gray-300">Remarks</th><th class="p-2 border border-gray-300 text-right">Amount</th></tr></thead>
+                            <tbody>${fil.length===0 ? '<tr><td colspan="4" class="p-4 text-center border border-gray-300 text-gray-500">No records found.</td></tr>' : fil.map(x=>`<tr><td class="p-2 border border-gray-300">${x.date}</td><td class="p-2 border border-gray-300">${x.mode}</td><td class="p-2 border border-gray-300">${x.remarks}</td><td class="p-2 border border-gray-300 text-right font-mono">₹${x.amount}</td></tr>`).join('')}</tbody>
+                            <tfoot><tr class="font-bold bg-gray-50"><td colspan="3" class="p-2 border border-gray-300 text-right">Total Paid</td><td class="p-2 border border-gray-300 text-right font-mono text-base">₹${tot}</td></tr></tfoot>
+                        </table>
+                        <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">Generated on ${new Date().toLocaleDateString()}</div>
+                    </div>`;
+                
+                document.getElementById('pdf-container').classList.remove('hidden');
+                html2pdf().from(div).set({ margin:10, filename:`${u.name}_Stmt.pdf`, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'a4'} }).save().then(()=>document.getElementById('pdf-container').classList.add('hidden'));
+            }
+        };
+
+        // Start App
+        DB.init();
+    </script>
+
+    <script>
+        const Sec = {
+            async hash(str) {
+                const msgBuffer = new TextEncoder().encode(str);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+        };
+
+        const Auth = {
+            curr: null,
+            async login() {
+                const e = document.getElementById('email').value;
+                const p = document.getElementById('password').value;
+                const pHash = await Sec.hash(p); 
+                const u = DB.getUsers().find(x => (x.email === e || x.email === 'demo') && x.password === pHash);
+                
+                if(u) { 
+                    this.curr = u; 
+                    document.getElementById('login-screen').classList.add('hidden'); 
+                    if (u.isDefaultPass && u.email !== 'demo') {
+                        document.getElementById('force-change-modal').classList.remove('hidden');
+                    } else {
+                        document.getElementById('app-container').classList.remove('hidden'); 
+                        UI.init();
+                    }
+                } 
+                else alert('Invalid Credentials');
+            },
+            async forceChange(e) {
+                e.preventDefault();
+                const p1 = document.getElementById('fcNewPass').value;
+                const p2 = document.getElementById('fcConfirmPass').value;
+                if (p1 !== p2) return alert("Passwords do not match");
+                if (p1.length < 6) return alert("Weak password (min 6 chars)");
+                
+                const newHash = await Sec.hash(p1);
+                const u = this.curr;
+                u.password = newHash;
+                u.isDefaultPass = false; 
+                await DB.updateUser(u);
+                
+                document.getElementById('force-change-modal').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden'); 
+                UI.init();
+                alert("Password Updated Successfully!");
+            },
+            logout() { this.curr=null; location.reload(); }
+        };
+
+        const UI = {
+            init() {
+                const u = Auth.curr;
+                document.getElementById('user-name').innerText = u.name;
+                document.getElementById('user-initial').innerText = u.name[0];
+                document.getElementById('current-date').innerText = new Date().toLocaleDateString('en-IN', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+                this.renderSidebar();
+                if(u.role==='admin') { document.getElementById('admin-tools').classList.remove('hidden'); this.renderPage('dashboard'); }
+                else { document.getElementById('admin-tools').classList.add('hidden'); this.renderPage('profile'); }
+            },
+            toggleSidebar() { 
+                const s=document.getElementById('sidebar'), o=document.getElementById('mobile-overlay');
+                if(s.classList.contains('-translate-x-full')) { s.classList.remove('-translate-x-full'); o.classList.remove('hidden'); }
+                else { s.classList.add('-translate-x-full'); o.classList.add('hidden'); }
+            },
+            handleNavClick(page) { if(window.innerWidth<1024) UI.toggleSidebar(); UI.renderPage(page); },
+            renderSidebar() {
+                const n = document.getElementById('sidebar-nav'); n.innerHTML='';
+                const reqs = DB.getRequests().filter(r=>r.status==='Pending').length;
+                const exps = DB.getExpenses().filter(e=>e.status==='Pending').length;
+                
+                const rb = reqs>0 ? `<span class="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full ml-auto badge-pulse shadow-sm">${reqs}</span>` : '';
+                const eb = exps>0 ? `<span class="bg-indigo-500 text-white text-[10px] px-2 py-0.5 rounded-full ml-auto badge-pulse shadow-sm">${exps}</span>` : '';
+
+                const items = Auth.curr.role==='admin' 
+                    ? [
+                        {id:'dashboard', i:'fa-chart-pie', l:'Overview'}, 
+                        {id:'employees', i:'fa-users', l:'Employees'}, 
+                        {id:'requests', i:'fa-bell', l:'Requests', b:rb}, 
+                        {id:'expenses', i:'fa-receipt', l:'Claims', b:eb}
+                      ]
+                    : [{id:'profile', i:'fa-id-card', l:'Dashboard'}, {id:'my-requests', i:'fa-paper-plane', l:'Requests'}, {id:'my-expenses', i:'fa-receipt', l:'Claims'}];
+                
+                items.forEach(x => n.innerHTML += `<button onclick="UI.handleNavClick('${x.id}')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-indigo-600 transition flex items-center gap-3 group"><i class="fa-solid ${x.i} w-5 text-center group-hover:scale-110 transition"></i> <span class="flex-1 text-sm font-medium">${x.l}</span> ${x.b||''}</button>`);
+            },
+            renderPage(page, id=null) {
+                const u = Auth.curr;
+                if(u.role !== 'admin' && ['dashboard', 'employees', 'requests', 'expenses'].includes(page)) return alert("Unauthorized access restricted.");
+                if(page === 'details' && u.role !== 'admin' && u.id !== id) return alert("Unauthorized profile access.");
+
+                const c = document.getElementById('content-area'); c.innerHTML='';
+                document.getElementById('page-title').innerText = page.toUpperCase().replace('-',' ');
+
+                if(page === 'dashboard') {
+                    const users = DB.getUsers().filter(u => u.role !== 'admin');
+                    const reqCount = DB.getRequests().filter(r => r.status === 'Pending').length;
+                    const expCount = DB.getExpenses().filter(e => e.status === 'Pending').length;
+                    
+                    let totalGen = 0;
+                    users.forEach(u => {
+                        const mw = DB.calcCycles(u.joinDate);
+                        const ded = DB.calcDeductions(u.id, u.salary);
+                        const earned = ((mw * u.salary) + (u.openingBalance || 0)) - ded;
+                        totalGen += earned;
+                    });
+
+                    c.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><i class="fa-solid fa-users text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Total Staff</p><h3 class="text-2xl font-bold text-slate-800">${users.length}</h3></div></div>
+                            <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><i class="fa-solid fa-coins text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Lifetime Salary</p><h3 class="text-2xl font-bold text-slate-800">₹${totalGen.toLocaleString()}</h3></div></div>
+                            <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600"><i class="fa-solid fa-bell text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Requests</p><h3 class="text-2xl font-bold text-slate-800">${reqCount}</h3></div></div>
+                            <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-600"><i class="fa-solid fa-receipt text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Claims</p><h3 class="text-2xl font-bold text-slate-800">${expCount}</h3></div></div>
+                        </div>
+                        <div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4">Recent Activity</h3><div class="space-y-4">${DB.getNotices().slice(0,3).map(n => `<div class="flex gap-4 items-start pb-4 border-b border-slate-50 last:border-0 last:pb-0"><div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0"><i class="fa-solid fa-info"></i></div><div><p class="text-sm text-slate-700">${n.text}</p><p class="text-xs text-slate-400 mt-1">${n.date}</p></div></div>`).join('')}<div class="text-center pt-2"><button onclick="UI.modal('add-notice')" class="text-indigo-600 text-sm font-medium hover:underline">+ Post New Notice</button></div></div></div>`;
+                }
+                else if(page === 'employees') {
+                    const users = DB.getUsers().filter(u=>u.role!=='admin');
+                    c.innerHTML = `
+                        <div class="flex justify-between items-center mb-6"><h3 class="font-bold text-slate-800 text-lg">Staff Directory</h3><button onclick="UI.modal('add')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-md shadow-indigo-200 transition"><i class="fa-solid fa-plus mr-2"></i>Add Employee</button></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${users.map(u => {
+                            const earned = ((DB.calcCycles(u.joinDate) * u.salary) + (u.openingBalance || 0)) - DB.calcDeductions(u.id, u.salary);
+                            const paid = DB.getPayments(u.id).reduce((s,p)=>s+p.amount,0);
+                            const bal = earned - paid;
+                            return `<div class="card-premium p-6 rounded-xl hover:shadow-lg transition group cursor-pointer emp-card" data-name="${u.name}" data-id="${u.id}" onclick="UI.renderPage('details', ${u.id})"><div class="flex justify-between items-start mb-4"><div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold border border-slate-200">${u.name[0]}</div><div class="text-right"><p class="text-[10px] text-slate-400 uppercase font-bold">Next Credit</p><p class="text-xs text-indigo-600 font-bold">${DB.nextCredit(u.joinDate)}</p></div></div><h3 class="font-bold text-slate-800 text-lg truncate">${u.name}</h3><p class="text-slate-500 text-sm mb-5">${u.designation}</p><div class="flex gap-2">${bal>0 ? `<span class="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-orange-100 flex-1 text-center">Due: ₹${bal}</span>` : bal<0 ? `<span class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-100 flex-1 text-center">Adv: ₹${Math.abs(bal)}</span>` : `<span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-100 flex-1 text-center">Settled</span>`}</div></div>`
+                        }).join('')}</div>`;
+                }
+                else if(page === 'details' || page === 'profile') {
+                    const u = page==='profile' ? Auth.curr : DB.getUsers().find(x=>x.id===id); if(!u) return;
+                    const payments = DB.getPayments(u.id); const leaves = DB.getLeaves(u.id);
+                    const mw = DB.calcCycles(u.joinDate);
+                    const ded = DB.calcDeductions(u.id, u.salary);
+                    const earned = ((mw * u.salary) + (u.openingBalance || 0)) - ded;
+                    const paid = payments.reduce((s,p)=>s+p.amount,0); const bal = earned - paid;
+                    const isAdmin = Auth.curr.role === 'admin';
+                    let status = bal>0 ? `<div class="bg-orange-50 border border-orange-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-orange-600 uppercase font-bold">Net Due</p><p class="text-xl font-bold text-orange-700">₹${bal}</p></div>` : bal<0 ? `<div class="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-blue-600 uppercase font-bold">Advance</p><p class="text-xl font-bold text-blue-700">₹${Math.abs(bal)}</p></div>` : `<div class="bg-emerald-50 border border-emerald-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-emerald-600 uppercase font-bold">Status</p><p class="text-xl font-bold text-emerald-700">Settled</p></div>`;
+
+                    c.innerHTML = `<div class="max-w-6xl mx-auto"><div class="flex justify-between items-center mb-6 no-print"><div class="flex gap-2">${isAdmin ? `<button onclick="UI.renderPage('employees')" class="text-slate-500 hover:text-slate-800 text-sm font-medium flex items-center transition"><i class="fa-solid fa-arrow-left mr-2"></i> Back</button>` : ''}</div><div class="flex gap-2">${isAdmin ? `<button onclick="UI.modal('edit', ${u.id})" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-pen mr-1"></i> Edit</button><button onclick="UI.modal('reset-pass', ${u.id})" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Reset Pass</button><button onclick="Actions.delEmp(${u.id})" class="bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-trash mr-1"></i> Delete</button>` : `<button onclick="UI.modal('change-pass')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Change Pass</button>`}</div></div><div class="card-premium p-8 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-8"><div class="flex items-center gap-6 w-full md:w-auto"><div class="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl shadow-slate-200">${u.name[0]}</div><div><h1 class="text-2xl font-bold text-slate-900">${u.name}</h1><p class="text-slate-500 font-medium">${u.designation}</p><div class="text-xs text-slate-400 mt-2 flex gap-4"><span class="flex items-center"><i class="fa-regular fa-calendar mr-1.5"></i> Joined: ${u.joinDate}</span><span class="flex items-center"><i class="fa-solid fa-phone mr-1.5"></i> ${u.mobile}</span></div></div></div><div class="flex gap-4 flex-wrap justify-center w-full md:w-auto"><div class="bg-red-50 border border-red-100 p-4 rounded-xl text-center min-w-[100px]"><p class="text-xs text-red-600 font-bold uppercase">LWP Cut</p><p class="text-xl font-bold text-red-700">-₹${ded}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Earned</p><p class="text-xl font-bold text-slate-700">₹${earned}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Paid</p><p class="text-xl font-bold text-emerald-600">₹${paid}</p></div>${status}</div></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div class="lg:col-span-2 space-y-8"><div class="card-premium p-6 rounded-xl"><div class="flex justify-between items-center mb-6"><h3 class="font-bold text-slate-800">Payment History</h3><div class="flex gap-2 pdf-controls"><input type="date" id="pdfFrom" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><input type="date" id="pdfTo" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><button onclick="DB.genPDF(${u.id})" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded text-xs font-medium transition shadow-sm">Download PDF</button></div></div><div class="overflow-auto max-h-96 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-slate-50 sticky top-0"><tr><th class="p-3 font-semibold">Date</th><th class="p-3 font-semibold">Mode</th><th class="p-3 font-semibold text-right">Amount</th><th class="p-3 w-10 no-print"></th></tr></thead><tbody class="divide-y divide-slate-100 text-slate-600">${payments.map(p=>`<tr class="hover:bg-slate-50 transition"><td class="p-3 text-xs">${p.date}</td><td class="p-3 text-xs"><span class="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">${p.mode}</span></td><td class="p-3 text-right font-mono font-bold text-slate-800">₹${p.amount}</td><td class="p-3 text-right no-print">${isAdmin?`<button onclick="UI.openModal('edit-payment', ${p.id})" class="text-indigo-500 hover:text-indigo-700 mr-3"><i class="fa-solid fa-pen"></i></button><button onclick="Actions.delPay(${p.id}, ${u.id})" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div><div class="space-y-8">${isAdmin ? `<div class="card-premium p-6 rounded-xl bg-slate-50/50 no-print"><h4 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider">Quick Actions</h4><form onsubmit="Actions.addPay(event, ${u.id})" class="space-y-3 mb-6 pb-6 border-b border-slate-200"><div class="grid grid-cols-2 gap-3"><input type="number" id="payAmt" placeholder="Amount" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="payDate" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required value="${new Date().toISOString().split('T')[0]}"></div><div class="grid grid-cols-2 gap-3"><select id="payMode" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option>Bank</option><option>Cash</option></select><input id="payRem" placeholder="Remarks" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"></div><button class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded text-sm font-medium transition shadow-md">Record Payment</button></form><div class="mb-6 pb-6 border-b border-slate-200"><form onsubmit="Actions.addLeave(event, ${u.id})" class="space-y-3"><div class="grid grid-cols-2 gap-3"><input type="date" id="lFrom" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="lTo" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><select id="lType" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option value="Paid">Paid Leave</option><option value="LWP">LWP (Unpaid)</option></select><input id="lReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-2 rounded text-sm font-medium transition">Record Leave</button></form></div><div><label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Import Data</label><input type="file" onchange="DB.importCSV(this, ${u.id})" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 transition"/></div></div>`:''}<div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4 text-sm">Leave History</h3><div class="overflow-auto max-h-60 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-white sticky top-0"><tr><th class="pb-2 font-semibold">Date</th><th class="pb-2 font-semibold">Days</th><th class="pb-2 font-semibold text-right">Type</th><th class="pb-2 w-8 no-print"></th></tr></thead><tbody class="text-slate-600">${leaves.map(l=>`<tr><td class="py-2 text-xs border-b border-slate-50">${l.startDate}<br><span class="text-slate-400">to</span> ${l.endDate}</td><td class="py-2 border-b border-slate-50 font-bold">${l.days}</td><td class="py-2 border-b border-slate-50 text-right"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.type==='LWP'?'bg-rose-50 text-rose-600 border border-rose-100':'bg-emerald-50 text-emerald-600 border border-emerald-100'}">${l.type}</span></td><td class="py-2 border-b border-slate-50 text-right no-print">${isAdmin?`<button onclick="Actions.delLeave(${l.id},${u.id})" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div></div></div>`;
+                }
+                else if(page==='requests'){
+                    const r = DB.getRequests().filter(x=>x.status==='Pending');
+                    c.innerHTML=`<div class="max-w-4xl mx-auto"><h3 class="text-slate-800 font-bold text-xl mb-6">Pending Requests</h3>${r.length===0?'<div class="card-premium p-12 text-center text-slate-400 rounded-xl">No pending requests</div>':`<div class="space-y-4">${r.map(x=>`<div class="card-premium p-6 rounded-xl flex justify-between items-center"><div><div class="flex items-center gap-2 mb-1"><span class="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-indigo-100">${x.type}</span><span class="text-slate-400 text-xs">${x.date}</span></div><h4 class="text-slate-800 font-bold text-lg">${x.empName}</h4><p class="text-slate-500 text-sm">${x.details}</p>${x.amount?`<p class="text-emerald-600 font-mono font-bold mt-1">₹${x.amount}</p>`:''}</div><div class="flex gap-3"><button onclick="Actions.procReq(${x.id},'Rejected')" class="text-rose-500 hover:bg-rose-50 px-4 py-2 rounded-lg text-sm border border-rose-100 font-medium transition">Reject</button><button onclick="Actions.procReq(${x.id},'Approved')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-md transition">Approve</button></div></div>`).join('')}</div>`}</div>`;
+                }
+                else if(page==='expenses'){
+                    const e = DB.getExpenses(); const p = e.filter(x=>x.status==='Pending');
+                    c.innerHTML=`<div class="max-w-4xl mx-auto"><h3 class="text-slate-800 font-bold text-xl mb-6">Expense Claims</h3>${p.length===0?'<div class="card-premium p-8 text-center text-slate-400 rounded-xl mb-8">No pending claims</div>':`<div class="space-y-4 mb-8">${p.map(x=>`<div class="card-premium p-6 rounded-xl border-l-4 border-indigo-500 flex justify-between items-center"><div><h4 class="text-slate-800 font-bold text-lg">${x.empName}</h4><p class="text-slate-500 text-sm">${x.reason}</p><p class="text-indigo-600 font-mono font-bold text-lg mt-1">₹${x.amount}</p><p class="text-slate-400 text-xs mt-1">${x.date}</p></div><div class="flex gap-3"><button onclick="Actions.procExp(${x.id},'Rejected')" class="text-rose-500 px-4 py-2 text-sm border border-rose-100 rounded-lg hover:bg-rose-50 font-medium transition">Reject</button><button onclick="Actions.procExp(${x.id},'Paid')" class="bg-indigo-600 text-white px-4 py-2 text-sm rounded-lg hover:bg-indigo-700 shadow-md font-medium transition">Pay</button></div></div>`).join('')}</div>`}<h4 class="text-slate-400 text-xs font-bold uppercase mb-4 tracking-wider">History</h4><div class="space-y-3">${e.filter(x=>x.status!=='Pending').map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm shadow-sm"><div><span class="font-bold text-slate-700">${x.empName}</span> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-600">${x.reason}</span> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-800 font-mono font-bold">₹${x.amount}</span></div><span class="text-xs px-2.5 py-1 rounded-full font-bold ${x.status==='Paid'?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-600 border border-rose-100'}">${x.status}</span></div>`).join('')}</div></div>`;
+                }
+                else if(page==='my-requests'){
+                    const u = Auth.curr; const r = DB.getRequests().filter(x=>x.empId===u.id).reverse();
+                    c.innerHTML=`<div class="max-w-4xl mx-auto"><div class="card-premium p-6 rounded-xl mb-8"><h3 class="font-bold text-slate-800 mb-6">New Request</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div><h4 class="text-xs font-bold text-slate-400 uppercase mb-3">Leave Application</h4><form onsubmit="Actions.submitRequest(event,'Leave')" class="space-y-3"><div class="grid grid-cols-2 gap-3"><input type="date" id="reqLeaveFrom" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="reqLeaveTo" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><select id="reqLeaveType" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option>Casual</option><option>Sick</option></select><input id="reqLeaveReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition">Apply Leave</button></form></div><div><h4 class="text-xs font-bold text-slate-400 uppercase mb-3">Salary Advance</h4><form onsubmit="Actions.submitRequest(event,'Advance')" class="space-y-3"><input type="number" id="reqAdvAmount" placeholder="Amount (₹)" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input id="reqAdvReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-emerald-600 text-white py-2 rounded text-sm font-medium hover:bg-emerald-700 transition">Request Advance</button></form></div></div></div><div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4">My History</h3><div class="space-y-3">${r.length===0?'<p class="text-slate-400 text-sm">No requests found.</p>':r.map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm"><div><p class="font-bold text-slate-700">${x.type}</p><p class="text-xs text-slate-500">${x.date}</p></div><span class="text-xs px-2.5 py-1 rounded-full font-bold ${x.status==='Pending'?'bg-orange-50 text-orange-600 border border-orange-100':x.status==='Approved'?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-600 border border-rose-100'}">${x.status}</span></div>`).join('')}</div></div></div>`;
+                }
+                else if(page==='my-expenses'){
+                    const u = Auth.curr; const e = DB.getExpenses().filter(x=>x.empId===u.id).reverse();
+                    c.innerHTML=`<div class="max-w-3xl mx-auto"><div class="card-premium p-6 rounded-xl mb-8"><h3 class="font-bold text-slate-800 mb-4">Submit Claim</h3><form onsubmit="Actions.submitExpense(event)" class="space-y-4"><div class="grid grid-cols-2 gap-4"><input type="number" id="expAmount" placeholder="Amount (₹)" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="expDate" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><input type="text" id="expReason" placeholder="Description (e.g. Travel, Office Supplies)" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition">Submit Claim</button></form></div><div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4">My Claims</h3><div class="space-y-3">${e.length===0?'<p class="text-slate-400 text-sm">No claims found.</p>':e.map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm"><div><p class="font-bold text-slate-700">${x.reason}</p><p class="text-xs text-gray-500">${x.date}</p><p class="text-blue-600 font-bold">₹${x.amount}</p></div><span class="px-2 py-1 rounded text-xs font-bold ${x.status==='Pending'?'bg-yellow-100 text-yellow-800':x.status==='Paid'?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${x.status}</span></div>`).join('')}</div></div></div>`;
+                }
+            },
+            
+            modal(t, id) {
+                const m=document.getElementById('modal'), tit=document.getElementById('modal-title'), con=document.getElementById('modal-content');
+                m.classList.remove('hidden');
+                
+                if(t==='add') { tit.innerText="New Employee"; con.innerHTML=`<form onsubmit="Actions.saveEmp(event)" class="space-y-4"><input id="mName" placeholder="Full Name" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition" required><input id="mEmail" placeholder="Email ID" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition" required><div class="grid grid-cols-2 gap-4"><input id="mMobile" placeholder="Mobile" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mJoin" type="date" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required></div><input id="mAddr" placeholder="Address" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mRole" placeholder="Designation" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><div class="grid grid-cols-2 gap-4"><input id="mSal" type="number" placeholder="Salary" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mOpen" type="number" placeholder="Opening Bal (+/-)" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition"></div><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">Create Account</button></form>`; }
+                else if(t==='edit') { const u=DB.getUsers().find(x=>x.id===id); tit.innerText="Edit Profile"; con.innerHTML=`<form onsubmit="Actions.updEmp(event, ${id})" class="space-y-4"><input id="eName" value="${u.name}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eEmail" value="${u.email}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><div class="grid grid-cols-2 gap-4"><input id="eMobile" value="${u.mobile}" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eJoin" type="date" value="${u.joinDate}" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"></div><input id="eAddr" value="${u.address}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eRole" value="${u.designation}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><div class="grid grid-cols-2 gap-4"><input id="eSal" value="${u.salary}" type="number" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eOpen" value="${u.openingBalance||0}" type="number" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"></div><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Save Changes</button></form>`; }
+                else if(t==='reset-pass') { tit.innerText="Reset Password"; con.innerHTML=`<form onsubmit="Actions.adminPass(event, ${id})" class="space-y-4"><p class="text-sm text-rose-500 font-medium bg-rose-50 p-3 rounded-lg border border-rose-100">Warning: This will override user's current password.</p><input id="newPassAdmin" placeholder="New Password" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><button class="w-full bg-rose-600 text-white p-3 rounded-lg font-bold hover:bg-rose-700 transition shadow-md">Reset Password</button></form>`; }
+                else if(t==='change-pass') { tit.innerText="Change Password"; con.innerHTML=`<form onsubmit="Actions.userPass(event)" class="space-y-4"><input type="password" id="oldP" placeholder="Current Password" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none" required><input type="password" id="newP" placeholder="New Password" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none" required><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Update Password</button></form>`; }
+                else if(t==='add-notice') { tit.innerText="Post Notice"; con.innerHTML=`<form onsubmit="Actions.postNotice(event)" class="space-y-4"><textarea id="nText" rows="3" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none" placeholder="Message..." required></textarea><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Publish</button></form>`; }
+                else if(t === 'edit-payment') { const p = DB.getPayments(Auth.curr.role==='admin'?DB.getUsers().find(x=>x.id===id).id:Auth.curr.id).find(x => x.id === id) || _payments.find(x=>x.id===id); tit.innerText="Edit Payment"; con.innerHTML=`<form onsubmit="Actions.editPay(event, ${id}, ${p.empId})" class="space-y-4"><input type="number" id="epAmount" value="${p.amount}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required><input type="date" id="epDate" value="${p.date}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required><select id="epMode" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><option ${p.mode==='Bank'?'selected':''}>Bank</option><option ${p.mode==='Cash'?'selected':''}>Cash</option></select><input id="epRemarks" value="${p.remarks||''}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Update</button></form>`; }
+                
+                // NEW: Admin Settings Modal
+                else if(t==='admin-settings') { 
+                    const u = Auth.curr;
+                    tit.innerText="Admin Settings"; 
+                    con.innerHTML=`
+                        <form onsubmit="Actions.updateAdminCreds(event)" class="space-y-4">
+                            <label class="block text-xs font-bold text-slate-500 uppercase">Change Username (Email)</label>
+                            <input id="adminNewEmail" type="email" value="${u.email}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required>
+                            
+                            <label class="block text-xs font-bold text-slate-500 uppercase mt-4">Change Password</label>
+                            <input id="adminNewPass" type="password" placeholder="New Password" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none">
+                            <p class="text-xs text-slate-400">Leave password blank to keep current one.</p>
+                            
+                            <button class="w-full bg-slate-800 text-white p-3 rounded-lg font-bold hover:bg-slate-700 transition mt-4">Update Credentials</button>
+                        </form>`; 
+                }
+            },
+            closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        };
+
+        const Actions = {
+            async saveEmp(e) { e.preventDefault(); const ph = await Sec.hash("123"); DB.saveUser({id:Date.now(), name:document.getElementById('mName').value, email:document.getElementById('mEmail').value, password:ph, role:"employee", designation:document.getElementById('mRole').value, mobile:document.getElementById('mMobile').value, address:document.getElementById('mAddr').value, joinDate:document.getElementById('mJoin').value, salary:parseInt(document.getElementById('mSal').value), openingBalance:parseInt(document.getElementById('mOpen').value)||0, status:"Active", isDefaultPass:true}); UI.closeModal(); UI.renderPage('employees'); },
+            updEmp(e, id) { e.preventDefault(); const u=DB.getUsers().find(x=>x.id===id); u.name=document.getElementById('eName').value; u.email=document.getElementById('eEmail').value; u.designation=document.getElementById('eRole').value; u.mobile=document.getElementById('eMobile').value; u.address=document.getElementById('eAddr').value; u.joinDate=document.getElementById('eJoin').value; u.salary=parseInt(document.getElementById('eSal').value); u.openingBalance=parseInt(document.getElementById('eOpen').value)||0; DB.updateUser(u); UI.closeModal(); UI.renderPage('details', id); },
+            delEmp(id) { if(confirm("Permanently delete this employee and all data?")) { DB.deleteUser(id); UI.renderPage('employees'); } },
+            
+            addPay(e, id) { e.preventDefault(); DB.addPayment({id:Date.now(), empId:id, amount:parseInt(document.getElementById('payAmt').value), date:document.getElementById('payDate').value, mode:document.getElementById('payMode').value, remarks:document.getElementById('payRem').value}); UI.renderPage('details', id); },
+            editPay(e, pid, empid) { e.preventDefault(); DB.updatePayment({ id: pid, empId: empid, amount: parseInt(document.getElementById('epAmount').value), date: document.getElementById('epDate').value, mode: document.getElementById('epMode').value, remarks: document.getElementById('epRemarks').value }); UI.closeModal(); UI.renderPage('details', empid); },
+            delPay(pid, uid) { if(confirm("Delete this payment?")) { DB.deletePayment(pid); UI.renderPage('details', uid); } },
+            
+            addLeave(e, id) { e.preventDefault(); const s=document.getElementById('lFrom').value, en=document.getElementById('lTo').value; const diff=Math.ceil(Math.abs(new Date(en)-new Date(s))/(8.64e7))+1; DB.addLeave({id:Date.now(), empId:id, startDate:s, endDate:en, type:document.getElementById('lType').value, reason:document.getElementById('lReason').value, days:diff}); UI.renderPage('details', id); },
+            delLeave(lid, uid) { if(confirm("Delete leave?")) { DB.deleteLeave(lid); UI.renderPage('details', uid); } },
+            
+            async procReq(id, act) { const r=await DB.updateRequest(id, act); if(act==='Approved') { if(r.type==='Advance') DB.addPayment({id:Date.now(), empId:r.empId, amount:r.amount, date:new Date().toISOString().split('T')[0], mode:'Advance', remarks:r.details}); else { const d=Math.ceil(Math.abs(new Date(r.to)-new Date(r.from))/(8.64e7))+1; DB.addLeave({id:Date.now(), empId:r.empId, startDate:r.from, endDate:r.to, type:r.subType, days:d}); } } UI.renderPage('requests'); UI.renderSidebar(); },
+            procExp(id, act) { DB.updateExpense(id, act); UI.renderPage('expenses'); UI.renderSidebar(); },
+            
+            submitExpense(e) { e.preventDefault(); const u = Auth.curr; DB.addExpense({ id: Date.now(), empId: u.id, empName: u.name, amount: parseInt(document.getElementById('expAmount').value), date: document.getElementById('expDate').value, reason: document.getElementById('expReason').value, status: 'Pending' }); alert("Claim Submitted"); UI.renderPage('my-expenses'); UI.renderSidebar(); },
+            submitRequest(e, type) { e.preventDefault(); const u = Auth.curr; let p = { id: Date.now(), empId: u.id, empName: u.name, type, status: 'Pending', date: new Date().toISOString().split('T')[0] }; if(type==='Leave'){ p.from=document.getElementById('reqLeaveFrom').value; p.to=document.getElementById('reqLeaveTo').value; p.subType=document.getElementById('reqLeaveType').value; p.details=`${p.subType}: ${document.getElementById('reqLeaveReason').value}`; p.days=Math.ceil(Math.abs(new Date(p.to)-new Date(p.from))/(8.64e7))+1; } else { p.amount=parseInt(document.getElementById('reqAdvAmount').value); p.details=document.getElementById('reqAdvReason').value; } DB.addRequest(p); alert("Submitted"); UI.renderPage('my-requests'); UI.renderSidebar(); },
+
+            async adminPass(e, id) { e.preventDefault(); const u=DB.getUsers().find(x=>x.id===id); u.password=await Sec.hash(document.getElementById('newPassAdmin').value); u.isDefaultPass=true; DB.updateUser(u); UI.closeModal(); alert("Password Reset."); },
+            async userPass(e) { e.preventDefault(); const u=Auth.curr; const oldH=await Sec.hash(document.getElementById('oldP').value); if(u.password!==oldH) return alert("Incorrect Password"); u.password=await Sec.hash(document.getElementById('newP').value); DB.updateUser(u); alert("Success! Please Login again."); Auth.logout(); },
+            
+            // NEW: Update Admin Credentials
+            async updateAdminCreds(e) {
+                e.preventDefault();
+                const u = Auth.curr;
+                const newEmail = document.getElementById('adminNewEmail').value;
+                const newPass = document.getElementById('adminNewPass').value;
+
+                if(newEmail) u.email = newEmail;
+                if(newPass) {
+                    if(newPass.length < 6) return alert("Password too short (min 6 chars)");
+                    u.password = await Sec.hash(newPass);
+                }
+
+                await DB.updateUser(u);
+                alert("Admin Credentials Updated! Please login again.");
+                Auth.logout();
+            },
+
+            postNotice(e) { e.preventDefault(); DB.addNotice(document.getElementById('nText').value); UI.closeModal(); UI.renderPage('dashboard'); },
+            deleteNotice(id) { DB.deleteNotice(id); UI.renderPage('dashboard'); },
+            resetSystem() { alert("Data wipe is disabled in Cloud Mode for security."); },
+        };
+    </script>
+    
+    <script>
+        // Register PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js');
+            });
+        }
+    </script>
+</body>
+</html>
