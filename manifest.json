@@ -1,6 +1,6 @@
 {
-  "name": "EDUNEXT HRMS",
-  "short_name": "HRMS",
+  "name": "KARMIK HRMS",
+  "short_name": "KARMIK",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8fafc",
@@ -20,3 +20,4 @@
   ]
 
 }
+
