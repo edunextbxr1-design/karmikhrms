@@ -12,6 +12,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function(){
+            // YOUR PUBLIC KEY
+            emailjs.init("SnyzSAT28OsA1H_SG");
+        })();
+    </script>
     
     <script>
         tailwind.config = {
@@ -69,7 +77,7 @@
                 <p class="text-slate-500 text-xs font-medium mt-2 uppercase tracking-wide">by IRA Education & IT Solutions </p>
             </div>
             <div class="space-y-4">
-                <input type="text" id="email" placeholder="Email or Login ID" class="w-full p-3 bg-white border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
+                <input type="text" id="email" placeholder="Login ID" class="w-full p-3 bg-white border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
                 <input type="password" id="password" placeholder="Password" class="w-full p-3 bg-white border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
                 <button onclick="Auth.login()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-semibold shadow-md shadow-indigo-600/10 transition-all transform active:scale-[0.98]">Sign In</button>
             </div>
@@ -137,7 +145,7 @@
             </header>
             <div id="content-area" class="flex-1 overflow-y-auto p-6 lg:p-8 relative pb-20 fade-in"></div>
             <footer class="border-t border-slate-200 bg-white text-slate-400 text-center py-3 text-[10px] w-full z-20">
-                Version 3.2 | © 2026 IRA Education
+                Version 3.7 | © 2026 IRA Education
             </footer>
         </main>
     </div>
@@ -163,13 +171,13 @@
         // ==========================================
         // CONFIG: PASTE YOUR FIREBASE CONFIG HERE
         // ==========================================
-       const firebaseConfig = {
+        const firebaseConfig = {
             apiKey: "AIzaSyCj3CaL3v1aivX8p6iTE_jXN1zlmL9dtU8",
             authDomain: "karmikhrsm-b9e9d.firebaseapp.com",
             projectId: "karmikhrsm-b9e9d",
             storageBucket: "karmikhrsm-b9e9d.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID", // Find this in your Firebase console
-            appId: "YOUR_APP_ID" // Find this in your Firebase console
+            messagingSenderId: "31420433896", // Update if needed
+            appId: "1:31420433896:web:1a912491a8b140c051905d" // Update if needed
         };
 
         const app = initializeApp(firebaseConfig);
@@ -202,13 +210,26 @@
                     if (_users.length === 0) {
                         const defaultPassHash = await Sec.hash("admin123");
                         const admin = { 
-                            id: 1715001, name: "System Admin", email: "admin@hr.com", password: defaultPassHash, 
+                            id: 1715001, name: "System Admin", email: "admin", notificationEmail: "admin@hr.com", password: defaultPassHash, 
                             role: "admin", designation: "HR Manager", salary: 0, mobile: "9999999999", 
                             address: "Office HQ", joinDate: "2023-01-01", openingBalance: 0, status: "Active", isDefaultPass: true
                         };
                         const docRef = await addDoc(collection(db, "users"), admin);
                         _users.push(admin);
                         _userDocs[admin.id] = docRef.id;
+                    }
+                    
+                    const savedUser = localStorage.getItem('karmik_user');
+                    if (savedUser) {
+                        const u = JSON.parse(savedUser);
+                        const exists = _users.find(x => String(x.id) === String(u.id));
+                        if(exists) {
+                            Auth.curr = exists;
+                            document.getElementById('app-container').classList.remove('hidden');
+                            document.getElementById('loading-screen').classList.add('hidden');
+                            UI.init();
+                            return; 
+                        }
                     }
                     
                     document.getElementById('loading-screen').classList.add('hidden');
@@ -228,7 +249,7 @@
                 _userDocs[user.id] = ref.id;
             },
             updateUser: async (user) => { 
-                const idx = _users.findIndex(x => x.id === user.id);
+                const idx = _users.findIndex(x => String(x.id) === String(user.id));
                 if(idx > -1) { 
                     _users[idx] = user; 
                     const docId = _userDocs[user.id];
@@ -236,39 +257,39 @@
                 }
             },
             deleteUser: async (id) => { 
-                _users = _users.filter(x => x.id !== id);
+                _users = _users.filter(x => String(x.id) !== String(id));
                 const docId = _userDocs[id];
                 if(docId) await deleteDoc(doc(db, "users", docId));
             },
 
             // --- Payments ---
-            getPayments: (id) => _payments.filter(p => p.empId === id).sort((a,b) => new Date(b.date)-new Date(a.date)),
+            getPayments: (id) => _payments.filter(p => String(p.empId) === String(id)).sort((a,b) => new Date(b.date)-new Date(a.date)),
             addPayment: async (p) => { 
                 _payments.push(p); 
                 const ref = await addDoc(collection(db, "payments"), p);
                 _payDocs[p.id] = ref.id;
             },
             updatePayment: async (p) => {
-                const idx = _payments.findIndex(x => x.id === p.id);
+                const idx = _payments.findIndex(x => String(x.id) === String(p.id));
                 if(idx > -1) _payments[idx] = p;
                 const docId = _payDocs[p.id];
                 if(docId) await updateDoc(doc(db, "payments", docId), p);
             },
             deletePayment: async (id) => { 
-                _payments = _payments.filter(x => x.id !== id);
+                _payments = _payments.filter(x => String(x.id) !== String(id));
                 const docId = _payDocs[id];
                 if(docId) await deleteDoc(doc(db, "payments", docId));
             },
 
             // --- Leaves ---
-            getLeaves: (id) => _leaves.filter(l => l.empId === id).sort((a,b) => new Date(b.startDate)-new Date(a.startDate)),
+            getLeaves: (id) => _leaves.filter(l => String(l.empId) === String(id)).sort((a,b) => new Date(b.startDate)-new Date(a.startDate)),
             addLeave: async (l) => { 
                 _leaves.push(l); 
                 const ref = await addDoc(collection(db, "leaves"), l);
                 _leaveDocs[l.id] = ref.id;
             },
             deleteLeave: async (id) => { 
-                _leaves = _leaves.filter(x => x.id !== id);
+                _leaves = _leaves.filter(x => String(x.id) !== String(id));
                 const docId = _leaveDocs[id];
                 if(docId) await deleteDoc(doc(db, "leaves", docId));
             },
@@ -281,7 +302,7 @@
                 _reqDocs[r.id] = ref.id;
             },
             updateRequest: async (id, status) => { 
-                const r = _requests.find(x => x.id === id);
+                const r = _requests.find(x => String(x.id) === String(id));
                 if(r) {
                     r.status = status;
                     const docId = _reqDocs[id];
@@ -298,7 +319,7 @@
                 _expDocs[e.id] = ref.id;
             },
             updateExpense: async (id, status) => { 
-                const e = _expenses.find(x => x.id === id);
+                const e = _expenses.find(x => String(x.id) === String(id));
                 if(e) {
                     e.status = status;
                     const docId = _expDocs[id];
@@ -315,7 +336,7 @@
                 _noteDocs[n.id] = ref.id;
             },
             deleteNotice: async (id) => {
-                 _notices = _notices.filter(x => x.id !== id);
+                 _notices = _notices.filter(x => String(x.id) !== String(id));
                  const docId = _noteDocs[id];
                  if(docId) await deleteDoc(doc(db, "notices", docId));
             },
@@ -364,7 +385,7 @@
                 return Math.max(0, m);
             },
             calcDeductions: (id, salary) => {
-                const leaves = _leaves.filter(l => l.empId === id && l.type === 'LWP');
+                const leaves = _leaves.filter(l => String(l.empId) === String(id) && l.type === 'LWP');
                 const days = leaves.reduce((sum, l) => sum + parseInt(l.days), 0);
                 return Math.round(days * (salary/30));
             },
@@ -394,8 +415,8 @@
             },
             genPDF: (id) => {
                 if(typeof html2pdf === 'undefined') return alert("PDF Lib missing.");
-                const u = _users.find(x=>x.id===id);
-                const p = _payments.filter(pay => pay.empId === id);
+                const u = _users.find(x=>String(x.id)===String(id));
+                const p = _payments.filter(pay => String(pay.empId) === String(id));
                 const f = document.getElementById('pdfFrom').value;
                 const t = document.getElementById('pdfTo').value;
                 if(!f || !t) return alert("Select Dates.");
@@ -451,7 +472,8 @@
                 const u = DB.getUsers().find(x => (x.email === e || x.email === 'demo') && x.password === pHash);
                 
                 if(u) { 
-                    this.curr = u; 
+                    this.curr = u;
+                    localStorage.setItem('karmik_user', JSON.stringify(u)); // SAVE SESSION
                     document.getElementById('login-screen').classList.add('hidden'); 
                     if (u.isDefaultPass && u.email !== 'demo') {
                         document.getElementById('force-change-modal').classList.remove('hidden');
@@ -475,19 +497,25 @@
                 u.isDefaultPass = false; 
                 await DB.updateUser(u);
                 
+                localStorage.setItem('karmik_user', JSON.stringify(u)); // UPDATE SESSION
+
                 document.getElementById('force-change-modal').classList.add('hidden');
                 document.getElementById('app-container').classList.remove('hidden'); 
                 UI.init();
                 alert("Password Updated Successfully!");
             },
-            logout() { this.curr=null; location.reload(); }
+            logout() { 
+                this.curr=null; 
+                localStorage.removeItem('karmik_user'); // CLEAR SESSION
+                location.reload(); 
+            }
         };
 
         const UI = {
             init() {
                 const u = Auth.curr;
                 document.getElementById('user-name').innerText = u.name;
-                document.getElementById('user-initial').innerText = u.name[0];
+                document.getElementById('user-initial').innerText = (u.name || 'U')[0].toUpperCase();
                 document.getElementById('current-date').innerText = new Date().toLocaleDateString('en-IN', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
                 this.renderSidebar();
                 if(u.role==='admin') { document.getElementById('admin-tools').classList.remove('hidden'); this.renderPage('dashboard'); }
@@ -499,29 +527,52 @@
                 else { s.classList.add('-translate-x-full'); o.classList.add('hidden'); }
             },
             handleNavClick(page) { if(window.innerWidth<1024) UI.toggleSidebar(); UI.renderPage(page); },
+            
+            // NEW: Search Filter Logic fixed
+            filterEmployees() {
+                const val = document.getElementById('searchInput').value.toLowerCase();
+                const cards = document.querySelectorAll('.emp-card');
+                cards.forEach(c => {
+                    const name = c.getAttribute('data-name').toLowerCase();
+                    c.style.display = name.includes(val) ? 'block' : 'none';
+                });
+            },
+
             renderSidebar() {
                 const n = document.getElementById('sidebar-nav'); n.innerHTML='';
+                const u = Auth.curr;
+
                 const reqs = DB.getRequests().filter(r=>r.status==='Pending').length;
                 const exps = DB.getExpenses().filter(e=>e.status==='Pending').length;
                 
+                const notices = DB.getNotices();
+                const lastSeen = localStorage.getItem(`lastSeenNotice_${u.id}`) || 0;
+                const unread = notices.filter(n => n.id > lastSeen).length;
+
                 const rb = reqs>0 ? `<span class="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full ml-auto badge-pulse shadow-sm">${reqs}</span>` : '';
                 const eb = exps>0 ? `<span class="bg-indigo-500 text-white text-[10px] px-2 py-0.5 rounded-full ml-auto badge-pulse shadow-sm">${exps}</span>` : '';
+                const nb = unread>0 ? `<span class="bg-yellow-500 text-white text-[10px] px-2 py-0.5 rounded-full ml-auto badge-pulse shadow-sm">${unread}</span>` : '';
 
-                const items = Auth.curr.role==='admin' 
+                const items = u.role==='admin' 
                     ? [
                         {id:'dashboard', i:'fa-chart-pie', l:'Overview'}, 
                         {id:'employees', i:'fa-users', l:'Employees'}, 
                         {id:'requests', i:'fa-bell', l:'Requests', b:rb}, 
                         {id:'expenses', i:'fa-receipt', l:'Claims', b:eb}
                       ]
-                    : [{id:'profile', i:'fa-id-card', l:'Dashboard'}, {id:'my-requests', i:'fa-paper-plane', l:'Requests'}, {id:'my-expenses', i:'fa-receipt', l:'Claims'}];
+                    : [
+                        {id:'profile', i:'fa-id-card', l:'Dashboard'}, 
+                        {id:'notices', i:'fa-bullhorn', l:'Notice Board', b:nb}, 
+                        {id:'my-requests', i:'fa-paper-plane', l:'Requests'}, 
+                        {id:'my-expenses', i:'fa-receipt', l:'Claims'}
+                    ];
                 
                 items.forEach(x => n.innerHTML += `<button onclick="UI.handleNavClick('${x.id}')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-indigo-600 transition flex items-center gap-3 group"><i class="fa-solid ${x.i} w-5 text-center group-hover:scale-110 transition"></i> <span class="flex-1 text-sm font-medium">${x.l}</span> ${x.b||''}</button>`);
             },
             renderPage(page, id=null) {
                 const u = Auth.curr;
                 if(u.role !== 'admin' && ['dashboard', 'employees', 'requests', 'expenses'].includes(page)) return alert("Unauthorized access restricted.");
-                if(page === 'details' && u.role !== 'admin' && u.id !== id) return alert("Unauthorized profile access.");
+                if(page === 'details' && u.role !== 'admin' && String(u.id) !== String(id)) return alert("Unauthorized profile access.");
 
                 const c = document.getElementById('content-area'); c.innerHTML='';
                 document.getElementById('page-title').innerText = page.toUpperCase().replace('-',' ');
@@ -533,7 +584,6 @@
                     
                     let totalGen = 0;
                     users.forEach(u => {
-                        // FIXED: Use salaryDate if it exists, else joinDate
                         const mw = DB.calcCycles(u.salaryDate || u.joinDate);
                         const ded = DB.calcDeductions(u.id, u.salary);
                         const earned = ((mw * u.salary) + (u.openingBalance || 0)) - ded;
@@ -554,18 +604,31 @@
                     c.innerHTML = `
                         <div class="flex justify-between items-center mb-6"><h3 class="font-bold text-slate-800 text-lg">Staff Directory</h3><button onclick="UI.modal('add')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-md shadow-indigo-200 transition"><i class="fa-solid fa-plus mr-2"></i>Add Employee</button></div>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${users.map(u => {
-                            // FIXED: Use salaryDate if it exists, else joinDate
                             const mw = DB.calcCycles(u.salaryDate || u.joinDate);
                             const earned = ((mw * u.salary) + (u.openingBalance || 0)) - DB.calcDeductions(u.id, u.salary);
                             const paid = DB.getPayments(u.id).reduce((s,p)=>s+p.amount,0);
                             const bal = earned - paid;
-                            return `<div class="card-premium p-6 rounded-xl hover:shadow-lg transition group cursor-pointer emp-card" data-name="${u.name}" data-id="${u.id}" onclick="UI.renderPage('details', ${u.id})"><div class="flex justify-between items-start mb-4"><div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold border border-slate-200">${u.name[0]}</div><div class="text-right"><p class="text-[10px] text-slate-400 uppercase font-bold">Next Credit</p><p class="text-xs text-indigo-600 font-bold">${DB.nextCredit(u.joinDate)}</p></div></div><h3 class="font-bold text-slate-800 text-lg truncate">${u.name}</h3><p class="text-slate-500 text-sm mb-5">${u.designation}</p><div class="flex gap-2">${bal>0 ? `<span class="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-orange-100 flex-1 text-center">Due: ₹${bal}</span>` : bal<0 ? `<span class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-100 flex-1 text-center">Adv: ₹${Math.abs(bal)}</span>` : `<span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-100 flex-1 text-center">Settled</span>`}</div></div>`
+                            // FIXED: Added quotes around ${u.id} in onclick
+                            return `<div class="card-premium p-6 rounded-xl hover:shadow-lg transition group cursor-pointer emp-card" data-name="${u.name}" data-id="${u.id}" onclick="UI.renderPage('details', '${u.id}')"><div class="flex justify-between items-start mb-4"><div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold border border-slate-200">${(u.name||'U')[0].toUpperCase()}</div><div class="text-right"><p class="text-[10px] text-slate-400 uppercase font-bold">Next Credit</p><p class="text-xs text-indigo-600 font-bold">${DB.nextCredit(u.joinDate)}</p></div></div><h3 class="font-bold text-slate-800 text-lg truncate">${u.name}</h3><p class="text-slate-500 text-sm mb-5">${u.designation}</p><div class="flex gap-2">${bal>0 ? `<span class="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-orange-100 flex-1 text-center">Due: ₹${bal}</span>` : bal<0 ? `<span class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-100 flex-1 text-center">Adv: ₹${Math.abs(bal)}</span>` : `<span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-100 flex-1 text-center">Settled</span>`}</div></div>`
                         }).join('')}</div>`;
                 }
                 else if(page === 'details' || page === 'profile') {
-                    const u = page==='profile' ? Auth.curr : DB.getUsers().find(x=>x.id===id); if(!u) return;
+                    // FIXED: Strict String matching for ID to prevent silent fails
+                    const u = page==='profile' ? Auth.curr : DB.getUsers().find(x=> String(x.id) === String(id)); 
+                    if(!u) { console.error("User not found", id); return alert("Error loading profile"); }
+
                     const payments = DB.getPayments(u.id); const leaves = DB.getLeaves(u.id);
-                    // FIXED: Use salaryDate if it exists, else joinDate
+                    
+                    const latestNotice = DB.getNotices()[0];
+                    const noticeHtml = (latestNotice && page === 'profile') ? `
+                        <div class="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-xl shadow-sm fade-in">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-bullhorn text-yellow-600"></i>
+                                <p class="text-sm text-yellow-800 font-medium">Latest Notice:</p>
+                            </div>
+                            <p class="text-sm text-yellow-700 mt-1 ml-7">${latestNotice.text}</p>
+                        </div>` : '';
+
                     const mw = DB.calcCycles(u.salaryDate || u.joinDate);
                     const ded = DB.calcDeductions(u.id, u.salary);
                     const earned = ((mw * u.salary) + (u.openingBalance || 0)) - ded;
@@ -573,24 +636,57 @@
                     const isAdmin = Auth.curr.role === 'admin';
                     let status = bal>0 ? `<div class="bg-orange-50 border border-orange-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-orange-600 uppercase font-bold">Net Due</p><p class="text-xl font-bold text-orange-700">₹${bal}</p></div>` : bal<0 ? `<div class="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-blue-600 uppercase font-bold">Advance</p><p class="text-xl font-bold text-blue-700">₹${Math.abs(bal)}</p></div>` : `<div class="bg-emerald-50 border border-emerald-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-emerald-600 uppercase font-bold">Status</p><p class="text-xl font-bold text-emerald-700">Settled</p></div>`;
 
-                    // ADDED: Increment Button to the "flex gap-2" div below
-                    c.innerHTML = `<div class="max-w-6xl mx-auto"><div class="flex justify-between items-center mb-6 no-print"><div class="flex gap-2">${isAdmin ? `<button onclick="UI.renderPage('employees')" class="text-slate-500 hover:text-slate-800 text-sm font-medium flex items-center transition"><i class="fa-solid fa-arrow-left mr-2"></i> Back</button>` : ''}</div><div class="flex gap-2">${isAdmin ? `<button onclick="UI.modal('edit', ${u.id})" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-pen mr-1"></i> Edit</button><button onclick="UI.modal('increment', ${u.id})" class="bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-arrow-trend-up mr-1"></i> Increment</button><button onclick="UI.modal('reset-pass', ${u.id})" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Reset Pass</button><button onclick="Actions.delEmp(${u.id})" class="bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-trash mr-1"></i> Delete</button>` : `<button onclick="UI.modal('change-pass')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Change Pass</button>`}</div></div><div class="card-premium p-8 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-8"><div class="flex items-center gap-6 w-full md:w-auto"><div class="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl shadow-slate-200">${u.name[0]}</div><div><h1 class="text-2xl font-bold text-slate-900">${u.name}</h1><p class="text-slate-500 font-medium">${u.designation}</p><div class="text-xs text-slate-400 mt-2 flex gap-4"><span class="flex items-center"><i class="fa-regular fa-calendar mr-1.5"></i> Joined: ${u.joinDate}</span><span class="flex items-center"><i class="fa-solid fa-phone mr-1.5"></i> ${u.mobile}</span></div></div></div><div class="flex gap-4 flex-wrap justify-center w-full md:w-auto"><div class="bg-red-50 border border-red-100 p-4 rounded-xl text-center min-w-[100px]"><p class="text-xs text-red-600 font-bold uppercase">LWP Cut</p><p class="text-xl font-bold text-red-700">-₹${ded}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Earned</p><p class="text-xl font-bold text-slate-700">₹${earned}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Paid</p><p class="text-xl font-bold text-emerald-600">₹${paid}</p></div>${status}</div></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div class="lg:col-span-2 space-y-8"><div class="card-premium p-6 rounded-xl"><div class="flex justify-between items-center mb-6"><h3 class="font-bold text-slate-800">Payment History</h3><div class="flex gap-2 pdf-controls"><input type="date" id="pdfFrom" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><input type="date" id="pdfTo" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><button onclick="DB.genPDF(${u.id})" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded text-xs font-medium transition shadow-sm">Download PDF</button></div></div><div class="overflow-auto max-h-96 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-slate-50 sticky top-0"><tr><th class="p-3 font-semibold">Date</th><th class="p-3 font-semibold">Mode</th><th class="p-3 font-semibold text-right">Amount</th><th class="p-3 w-10 no-print"></th></tr></thead><tbody class="divide-y divide-slate-100 text-slate-600">${payments.map(p=>`<tr class="hover:bg-slate-50 transition"><td class="p-3 text-xs">${p.date}</td><td class="p-3 text-xs"><span class="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">${p.mode}</span></td><td class="p-3 text-right font-mono font-bold text-slate-800">₹${p.amount}</td><td class="p-3 text-right no-print">${isAdmin?`<button onclick="UI.openModal('edit-payment', ${p.id})" class="text-indigo-500 hover:text-indigo-700 mr-3"><i class="fa-solid fa-pen"></i></button><button onclick="Actions.delPay(${p.id}, ${u.id})" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div><div class="space-y-8">${isAdmin ? `<div class="card-premium p-6 rounded-xl bg-slate-50/50 no-print"><h4 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider">Quick Actions</h4><form onsubmit="Actions.addPay(event, ${u.id})" class="space-y-3 mb-6 pb-6 border-b border-slate-200"><div class="grid grid-cols-2 gap-3"><input type="number" id="payAmt" placeholder="Amount" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="payDate" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required value="${new Date().toISOString().split('T')[0]}"></div><div class="grid grid-cols-2 gap-3"><select id="payMode" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option>Bank</option><option>Cash</option></select><input id="payRem" placeholder="Remarks" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"></div><button class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded text-sm font-medium transition shadow-md">Record Payment</button></form><div class="mb-6 pb-6 border-b border-slate-200"><form onsubmit="Actions.addLeave(event, ${u.id})" class="space-y-3"><div class="grid grid-cols-2 gap-3"><input type="date" id="lFrom" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="lTo" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><select id="lType" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option value="Paid">Paid Leave</option><option value="LWP">LWP (Unpaid)</option></select><input id="lReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-2 rounded text-sm font-medium transition">Record Leave</button></form></div><div><label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Import Data</label><input type="file" onchange="DB.importCSV(this, ${u.id})" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 transition"/></div></div>`:''}<div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4 text-sm">Leave History</h3><div class="overflow-auto max-h-60 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-white sticky top-0"><tr><th class="pb-2 font-semibold">Date</th><th class="pb-2 font-semibold">Days</th><th class="pb-2 font-semibold text-right">Type</th><th class="pb-2 w-8 no-print"></th></tr></thead><tbody class="text-slate-600">${leaves.map(l=>`<tr><td class="py-2 text-xs border-b border-slate-50">${l.startDate}<br><span class="text-slate-400">to</span> ${l.endDate}</td><td class="py-2 border-b border-slate-50 font-bold">${l.days}</td><td class="py-2 border-b border-slate-50 text-right"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.type==='LWP'?'bg-rose-50 text-rose-600 border border-rose-100':'bg-emerald-50 text-emerald-600 border border-emerald-100'}">${l.type}</span></td><td class="py-2 border-b border-slate-50 text-right no-print">${isAdmin?`<button onclick="Actions.delLeave(${l.id},${u.id})" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div></div></div>`;
+                    c.innerHTML = `<div class="max-w-6xl mx-auto">${noticeHtml}<div class="flex justify-between items-center mb-6 no-print"><div class="flex gap-2">${isAdmin ? `<button onclick="UI.renderPage('employees')" class="text-slate-500 hover:text-slate-800 text-sm font-medium flex items-center transition"><i class="fa-solid fa-arrow-left mr-2"></i> Back</button>` : ''}</div><div class="flex gap-2">${isAdmin ? `<button onclick="UI.modal('edit', '${u.id}')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-pen mr-1"></i> Edit</button><button onclick="UI.modal('increment', '${u.id}')" class="bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-arrow-trend-up mr-1"></i> Increment</button><button onclick="UI.modal('reset-pass', '${u.id}')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Reset Pass</button><button onclick="Actions.delEmp('${u.id}')" class="bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-trash mr-1"></i> Delete</button>` : `<button onclick="UI.modal('change-pass')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Change Pass</button>`}</div></div><div class="card-premium p-8 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-8"><div class="flex items-center gap-6 w-full md:w-auto"><div class="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl shadow-slate-200">${(u.name||'U')[0].toUpperCase()}</div><div><h1 class="text-2xl font-bold text-slate-900">${u.name}</h1><p class="text-slate-500 font-medium">${u.designation}</p><div class="text-xs text-slate-400 mt-2 flex gap-4"><span class="flex items-center"><i class="fa-regular fa-calendar mr-1.5"></i> Joined: ${u.joinDate}</span><span class="flex items-center"><i class="fa-solid fa-phone mr-1.5"></i> ${u.mobile}</span></div></div></div><div class="flex gap-4 flex-wrap justify-center w-full md:w-auto"><div class="bg-red-50 border border-red-100 p-4 rounded-xl text-center min-w-[100px]"><p class="text-xs text-red-600 font-bold uppercase">LWP Cut</p><p class="text-xl font-bold text-red-700">-₹${ded}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Earned</p><p class="text-xl font-bold text-slate-700">₹${earned}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Paid</p><p class="text-xl font-bold text-emerald-600">₹${paid}</p></div>${status}</div></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div class="lg:col-span-2 space-y-8"><div class="card-premium p-6 rounded-xl"><div class="flex justify-between items-center mb-6"><h3 class="font-bold text-slate-800">Payment History</h3><div class="flex gap-2 pdf-controls"><input type="date" id="pdfFrom" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><input type="date" id="pdfTo" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><button onclick="DB.genPDF('${u.id}')" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded text-xs font-medium transition shadow-sm">Download PDF</button></div></div><div class="overflow-auto max-h-96 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-slate-50 sticky top-0"><tr><th class="p-3 font-semibold">Date</th><th class="p-3 font-semibold">Mode</th><th class="p-3 font-semibold text-right">Amount</th><th class="p-3 w-10 no-print"></th></tr></thead><tbody class="divide-y divide-slate-100 text-slate-600">${payments.map(p=>`<tr class="hover:bg-slate-50 transition"><td class="p-3 text-xs">${p.date}</td><td class="p-3 text-xs"><span class="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">${p.mode}</span></td><td class="p-3 text-right font-mono font-bold text-slate-800">₹${p.amount}</td><td class="p-3 text-right no-print">${isAdmin?`<button onclick="UI.modal('edit-payment', '${p.id}')" class="text-indigo-500 hover:text-indigo-700 mr-3"><i class="fa-solid fa-pen"></i></button><button onclick="Actions.delPay('${p.id}', '${u.id}')" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div><div class="space-y-8">${isAdmin ? `<div class="card-premium p-6 rounded-xl bg-slate-50/50 no-print"><h4 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider">Quick Actions</h4><form onsubmit="Actions.addPay(event, '${u.id}')" class="space-y-3 mb-6 pb-6 border-b border-slate-200"><div class="grid grid-cols-2 gap-3"><input type="number" id="payAmt" placeholder="Amount" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="payDate" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required value="${new Date().toISOString().split('T')[0]}"></div><div class="grid grid-cols-2 gap-3"><select id="payMode" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option>Bank</option><option>Cash</option></select><input id="payRem" placeholder="Remarks" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"></div><button class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded text-sm font-medium transition shadow-md">Record Payment</button></form><div class="mb-6 pb-6 border-b border-slate-200"><form onsubmit="Actions.addLeave(event, '${u.id}')" class="space-y-3"><div class="grid grid-cols-2 gap-3"><input type="date" id="lFrom" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="lTo" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><select id="lType" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option value="Paid">Paid Leave</option><option value="LWP">LWP (Unpaid)</option></select><input id="lReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-2 rounded text-sm font-medium transition">Record Leave</button></form></div><div><label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Import Data</label><input type="file" onchange="DB.importCSV(this, '${u.id}')" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 transition"/></div></div>`:''}<div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4 text-sm">Leave History</h3><div class="overflow-auto max-h-60 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-white sticky top-0"><tr><th class="pb-2 font-semibold">Date</th><th class="pb-2 font-semibold">Days</th><th class="pb-2 font-semibold text-right">Type</th><th class="pb-2 w-8 no-print"></th></tr></thead><tbody class="text-slate-600">${leaves.map(l=>`<tr><td class="py-2 text-xs border-b border-slate-50">${l.startDate}<br><span class="text-slate-400">to</span> ${l.endDate}</td><td class="py-2 border-b border-slate-50 font-bold">${l.days}</td><td class="py-2 border-b border-slate-50 text-right"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.type==='LWP'?'bg-rose-50 text-rose-600 border border-rose-100':'bg-emerald-50 text-emerald-600 border border-emerald-100'}">${l.type}</span></td><td class="py-2 border-b border-slate-50 text-right no-print">${isAdmin?`<button onclick="Actions.delLeave('${l.id}','${u.id}')" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div></div></div>`;
                 }
                 else if(page==='requests'){
                     const r = DB.getRequests().filter(x=>x.status==='Pending');
-                    c.innerHTML=`<div class="max-w-4xl mx-auto"><h3 class="text-slate-800 font-bold text-xl mb-6">Pending Requests</h3>${r.length===0?'<div class="card-premium p-12 text-center text-slate-400 rounded-xl">No pending requests</div>':`<div class="space-y-4">${r.map(x=>`<div class="card-premium p-6 rounded-xl flex justify-between items-center"><div><div class="flex items-center gap-2 mb-1"><span class="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-indigo-100">${x.type}</span><span class="text-slate-400 text-xs">${x.date}</span></div><h4 class="text-slate-800 font-bold text-lg">${x.empName}</h4><p class="text-slate-500 text-sm">${x.details}</p>${x.amount?`<p class="text-emerald-600 font-mono font-bold mt-1">₹${x.amount}</p>`:''}</div><div class="flex gap-3"><button onclick="Actions.procReq(${x.id},'Rejected')" class="text-rose-500 hover:bg-rose-50 px-4 py-2 rounded-lg text-sm border border-rose-100 font-medium transition">Reject</button><button onclick="Actions.procReq(${x.id},'Approved')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-md transition">Approve</button></div></div>`).join('')}</div>`}</div>`;
+                    const history = DB.getRequests().filter(x=>x.status!=='Pending').reverse();
+                    
+                    c.innerHTML=`
+                    <div class="max-w-4xl mx-auto">
+                        <h3 class="text-slate-800 font-bold text-xl mb-6">Pending Requests</h3>
+                        ${r.length===0?'<div class="card-premium p-12 text-center text-slate-400 rounded-xl mb-8">No pending requests</div>':`<div class="space-y-4 mb-8">${r.map(x=>`<div class="card-premium p-6 rounded-xl flex justify-between items-center"><div><div class="flex items-center gap-2 mb-1"><span class="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-indigo-100">${x.type}</span><span class="text-slate-400 text-xs">${x.date}</span></div><h4 class="text-slate-800 font-bold text-lg">${x.empName}</h4><p class="text-slate-500 text-sm">${x.details}</p>${x.amount?`<p class="text-emerald-600 font-mono font-bold mt-1">₹${x.amount}</p>`:''}</div><div class="flex gap-3"><button onclick="Actions.procReq('${x.id}','Rejected')" class="text-rose-500 hover:bg-rose-50 px-4 py-2 rounded-lg text-sm border border-rose-100 font-medium transition">Reject</button><button onclick="Actions.procReq('${x.id}','Approved')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-md transition">Approve</button></div></div>`).join('')}</div>`}
+                        
+                        <h3 class="text-slate-800 font-bold text-xl mb-6">Request History</h3>
+                        ${history.length===0?'<div class="text-center text-slate-400 text-sm">No history found.</div>':`<div class="space-y-3">${history.map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm shadow-sm"><div><span class="font-bold text-slate-700">${x.empName}</span> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-600">${x.type}</span> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-500">${x.date}</span></div><span class="text-xs px-2.5 py-1 rounded-full font-bold ${x.status==='Approved'?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-600 border border-rose-100'}">${x.status}</span></div>`).join('')}</div>`}
+                    </div>`;
                 }
                 else if(page==='expenses'){
                     const e = DB.getExpenses(); const p = e.filter(x=>x.status==='Pending');
-                    c.innerHTML=`<div class="max-w-4xl mx-auto"><h3 class="text-slate-800 font-bold text-xl mb-6">Expense Claims</h3>${p.length===0?'<div class="card-premium p-8 text-center text-slate-400 rounded-xl mb-8">No pending claims</div>':`<div class="space-y-4 mb-8">${p.map(x=>`<div class="card-premium p-6 rounded-xl border-l-4 border-indigo-500 flex justify-between items-center"><div><h4 class="text-slate-800 font-bold text-lg">${x.empName}</h4><p class="text-slate-500 text-sm">${x.reason}</p><p class="text-indigo-600 font-mono font-bold text-lg mt-1">₹${x.amount}</p><p class="text-slate-400 text-xs mt-1">${x.date}</p></div><div class="flex gap-3"><button onclick="Actions.procExp(${x.id},'Rejected')" class="text-rose-500 px-4 py-2 text-sm border border-rose-100 rounded-lg hover:bg-rose-50 font-medium transition">Reject</button><button onclick="Actions.procExp(${x.id},'Paid')" class="bg-indigo-600 text-white px-4 py-2 text-sm rounded-lg hover:bg-indigo-700 shadow-md font-medium transition">Pay</button></div></div>`).join('')}</div>`}<h4 class="text-slate-400 text-xs font-bold uppercase mb-4 tracking-wider">History</h4><div class="space-y-3">${e.filter(x=>x.status!=='Pending').map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm shadow-sm"><div><span class="font-bold text-slate-700">${x.empName}</span> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-600">${x.reason}</span> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-800 font-mono font-bold">₹${x.amount}</span></div><span class="text-xs px-2.5 py-1 rounded-full font-bold ${x.status==='Paid'?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-600 border border-rose-100'}">${x.status}</span></div>`).join('')}</div></div>`;
+                    c.innerHTML=`<div class="max-w-4xl mx-auto"><h3 class="text-slate-800 font-bold text-xl mb-6">Expense Claims</h3>${p.length===0?'<div class="card-premium p-8 text-center text-slate-400 rounded-xl mb-8">No pending claims</div>':`<div class="space-y-4 mb-8">${p.map(x=>`<div class="card-premium p-6 rounded-xl border-l-4 border-indigo-500 flex justify-between items-center"><div><h4 class="text-slate-800 font-bold text-lg">${x.empName}</h4><p class="text-slate-500 text-sm">${x.reason}</p><p class="text-indigo-600 font-mono font-bold text-lg mt-1">₹${x.amount}</p><p class="text-slate-400 text-xs mt-1">${x.date}</p></div><div class="flex gap-3"><button onclick="Actions.procExp('${x.id}','Rejected')" class="text-rose-500 px-4 py-2 text-sm border border-rose-100 rounded-lg hover:bg-rose-50 font-medium transition">Reject</button><button onclick="Actions.procExp('${x.id}','Paid')" class="bg-indigo-600 text-white px-4 py-2 text-sm rounded-lg hover:bg-indigo-700 shadow-md font-medium transition">Pay</button></div></div>`).join('')}</div>`}<h4 class="text-slate-400 text-xs font-bold uppercase mb-4 tracking-wider">History</h4><div class="space-y-3">${e.filter(x=>x.status!=='Pending').map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm shadow-sm"><div><span class="font-bold text-slate-700">${x.empName}</span> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-600">${x.reason}</span> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-800 font-mono font-bold">₹${x.amount}</span></div><span class="text-xs px-2.5 py-1 rounded-full font-bold ${x.status==='Paid'?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-600 border border-rose-100'}">${x.status}</span></div>`).join('')}</div></div>`;
                 }
                 else if(page==='my-requests'){
-                    const u = Auth.curr; const r = DB.getRequests().filter(x=>x.empId===u.id).reverse();
+                    const u = Auth.curr; const r = DB.getRequests().filter(x=>String(x.empId)===String(u.id)).reverse();
                     c.innerHTML=`<div class="max-w-4xl mx-auto"><div class="card-premium p-6 rounded-xl mb-8"><h3 class="font-bold text-slate-800 mb-6">New Request</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div><h4 class="text-xs font-bold text-slate-400 uppercase mb-3">Leave Application</h4><form onsubmit="Actions.submitRequest(event,'Leave')" class="space-y-3"><div class="grid grid-cols-2 gap-3"><input type="date" id="reqLeaveFrom" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="reqLeaveTo" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><select id="reqLeaveType" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option>Casual</option><option>Sick</option></select><input id="reqLeaveReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition">Apply Leave</button></form></div><div><h4 class="text-xs font-bold text-slate-400 uppercase mb-3">Salary Advance</h4><form onsubmit="Actions.submitRequest(event,'Advance')" class="space-y-3"><input type="number" id="reqAdvAmount" placeholder="Amount (₹)" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input id="reqAdvReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-emerald-600 text-white py-2 rounded text-sm font-medium hover:bg-emerald-700 transition">Request Advance</button></form></div></div></div><div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4">My History</h3><div class="space-y-3">${r.length===0?'<p class="text-slate-400 text-sm">No requests found.</p>':r.map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm"><div><p class="font-bold text-slate-700">${x.type}</p><p class="text-xs text-slate-500">${x.date}</p></div><span class="text-xs px-2.5 py-1 rounded-full font-bold ${x.status==='Pending'?'bg-orange-50 text-orange-600 border border-orange-100':x.status==='Approved'?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-600 border border-rose-100'}">${x.status}</span></div>`).join('')}</div></div></div>`;
                 }
                 else if(page==='my-expenses'){
-                    const u = Auth.curr; const e = DB.getExpenses().filter(x=>x.empId===u.id).reverse();
+                    const u = Auth.curr; const e = DB.getExpenses().filter(x=>String(x.empId)===String(u.id)).reverse();
                     c.innerHTML=`<div class="max-w-3xl mx-auto"><div class="card-premium p-6 rounded-xl mb-8"><h3 class="font-bold text-slate-800 mb-4">Submit Claim</h3><form onsubmit="Actions.submitExpense(event)" class="space-y-4"><div class="grid grid-cols-2 gap-4"><input type="number" id="expAmount" placeholder="Amount (₹)" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="expDate" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><input type="text" id="expReason" placeholder="Description (e.g. Travel, Office Supplies)" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition">Submit Claim</button></form></div><div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4">My Claims</h3><div class="space-y-3">${e.length===0?'<p class="text-slate-400 text-sm">No claims found.</p>':e.map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm"><div><p class="font-bold text-slate-700">${x.reason}</p><p class="text-xs text-gray-500">${x.date}</p><p class="text-blue-600 font-bold">₹${x.amount}</p></div><span class="px-2 py-1 rounded text-xs font-bold ${x.status==='Pending'?'bg-yellow-100 text-yellow-800':x.status==='Paid'?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${x.status}</span></div>`).join('')}</div></div></div>`;
+                }
+                else if(page === 'notices') {
+                    const notices = DB.getNotices();
+                    if(notices.length > 0) {
+                        localStorage.setItem(`lastSeenNotice_${Auth.curr.id}`, notices[0].id);
+                        UI.renderSidebar(); 
+                    }
+                    c.innerHTML = `
+                        <div class="max-w-4xl mx-auto">
+                            <h3 class="text-slate-800 font-bold text-xl mb-6">Notice Board</h3>
+                            ${notices.length === 0 ? 
+                                '<div class="card-premium p-12 text-center text-slate-400 rounded-xl">No notices posted yet.</div>' : 
+                                `<div class="space-y-4">
+                                    ${notices.map(n => `
+                                        <div class="card-premium p-6 rounded-xl border-l-4 border-indigo-500 bg-white">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">${n.date}</span>
+                                                ${u.role === 'admin' ? `<button onclick="Actions.deleteNotice('${n.id}')" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash text-xs"></i></button>` : ''}
+                                            </div>
+                                            <p class="text-slate-700 leading-relaxed">${n.text}</p>
+                                        </div>
+                                    `).join('')}
+                                </div>`
+                            }
+                        </div>`;
                 }
             },
             
@@ -598,26 +694,25 @@
                 const m=document.getElementById('modal'), tit=document.getElementById('modal-title'), con=document.getElementById('modal-content');
                 m.classList.remove('hidden');
                 
-                if(t==='add') { tit.innerText="New Employee"; con.innerHTML=`<form onsubmit="Actions.saveEmp(event)" class="space-y-4"><input id="mName" placeholder="Full Name" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition" required><input id="mEmail" placeholder="Email ID" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition" required><div class="grid grid-cols-2 gap-4"><input id="mMobile" placeholder="Mobile" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mJoin" type="date" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required></div><input id="mAddr" placeholder="Address" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mRole" placeholder="Designation" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><div class="grid grid-cols-2 gap-4"><input id="mSal" type="number" placeholder="Salary" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mOpen" type="number" placeholder="Opening Bal (+/-)" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition"></div><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">Create Account</button></form>`; }
-                else if(t==='edit') { const u=DB.getUsers().find(x=>x.id===id); tit.innerText="Edit Profile"; con.innerHTML=`<form onsubmit="Actions.updEmp(event, ${id})" class="space-y-4"><input id="eName" value="${u.name}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eEmail" value="${u.email}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><div class="grid grid-cols-2 gap-4"><input id="eMobile" value="${u.mobile}" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eJoin" type="date" value="${u.joinDate}" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"></div><input id="eAddr" value="${u.address}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eRole" value="${u.designation}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><div class="grid grid-cols-2 gap-4"><input id="eSal" value="${u.salary}" type="number" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eOpen" value="${u.openingBalance||0}" type="number" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"></div><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Save Changes</button></form>`; }
-                else if(t==='reset-pass') { tit.innerText="Reset Password"; con.innerHTML=`<form onsubmit="Actions.adminPass(event, ${id})" class="space-y-4"><p class="text-sm text-rose-500 font-medium bg-rose-50 p-3 rounded-lg border border-rose-100">Warning: This will override user's current password.</p><input id="newPassAdmin" placeholder="New Password" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><button class="w-full bg-rose-600 text-white p-3 rounded-lg font-bold hover:bg-rose-700 transition shadow-md">Reset Password</button></form>`; }
+                if(t==='add') { tit.innerText="New Employee"; con.innerHTML=`<form onsubmit="Actions.saveEmp(event)" class="space-y-4"><input id="mName" placeholder="Full Name" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition" required><div class="grid grid-cols-2 gap-4"><input id="mEmail" placeholder="Login ID" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition" required><input id="mNotifyEmail" placeholder="Notification Email" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition" required></div><div class="grid grid-cols-2 gap-4"><input id="mMobile" placeholder="Mobile" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mJoin" type="date" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required></div><input id="mAddr" placeholder="Address" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mRole" placeholder="Designation" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><div class="grid grid-cols-2 gap-4"><input id="mSal" type="number" placeholder="Salary" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><input id="mOpen" type="number" placeholder="Opening Bal (+/-)" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition"></div><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">Create Account</button></form>`; }
+                else if(t==='edit') { const u=DB.getUsers().find(x=>String(x.id)===String(id)); tit.innerText="Edit Profile"; con.innerHTML=`<form onsubmit="Actions.updEmp(event, '${id}')" class="space-y-4"><input id="eName" value="${u.name}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><div class="grid grid-cols-2 gap-4"><input id="eEmail" value="${u.email}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none" title="Login ID"><input id="eNotifyEmail" value="${u.notificationEmail || ''}" placeholder="Notification Email" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"></div><div class="grid grid-cols-2 gap-4"><input id="eMobile" value="${u.mobile}" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eJoin" type="date" value="${u.joinDate}" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"></div><input id="eAddr" value="${u.address}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eRole" value="${u.designation}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><div class="grid grid-cols-2 gap-4"><input id="eSal" value="${u.salary}" type="number" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"><input id="eOpen" value="${u.openingBalance||0}" type="number" class="bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none"></div><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Save Changes</button></form>`; }
+                else if(t==='reset-pass') { tit.innerText="Reset Password"; con.innerHTML=`<form onsubmit="Actions.adminPass(event, '${id}')" class="space-y-4"><p class="text-sm text-rose-500 font-medium bg-rose-50 p-3 rounded-lg border border-rose-100">Warning: This will override user's current password.</p><input id="newPassAdmin" placeholder="New Password" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none focus:border-indigo-500 transition" required><button class="w-full bg-rose-600 text-white p-3 rounded-lg font-bold hover:bg-rose-700 transition shadow-md">Reset Password</button></form>`; }
                 else if(t==='change-pass') { tit.innerText="Change Password"; con.innerHTML=`<form onsubmit="Actions.userPass(event)" class="space-y-4"><input type="password" id="oldP" placeholder="Current Password" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none" required><input type="password" id="newP" placeholder="New Password" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none" required><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Update Password</button></form>`; }
                 else if(t==='add-notice') { tit.innerText="Post Notice"; con.innerHTML=`<form onsubmit="Actions.postNotice(event)" class="space-y-4"><textarea id="nText" rows="3" class="w-full bg-slate-50 border border-slate-200 text-slate-800 p-3 rounded-lg outline-none" placeholder="Message..." required></textarea><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Publish</button></form>`; }
-                else if(t === 'edit-payment') { const p = DB.getPayments(Auth.curr.role==='admin'?DB.getUsers().find(x=>x.id===id).id:Auth.curr.id).find(x => x.id === id) || _payments.find(x=>x.id===id); tit.innerText="Edit Payment"; con.innerHTML=`<form onsubmit="Actions.editPay(event, ${id}, ${p.empId})" class="space-y-4"><input type="number" id="epAmount" value="${p.amount}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required><input type="date" id="epDate" value="${p.date}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required><select id="epMode" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><option ${p.mode==='Bank'?'selected':''}>Bank</option><option ${p.mode==='Cash'?'selected':''}>Cash</option></select><input id="epRemarks" value="${p.remarks||''}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Update</button></form>`; }
+                else if(t === 'edit-payment') { const p = DB.getPayments(Auth.curr.role==='admin'?DB.getUsers().find(x=>String(x.id)===String(id)).id:Auth.curr.id).find(x => String(x.id) === String(id)) || _payments.find(x=>String(x.id)===String(id)); tit.innerText="Edit Payment"; con.innerHTML=`<form onsubmit="Actions.editPay(event, '${id}', '${p.empId}')" class="space-y-4"><input type="number" id="epAmount" value="${p.amount}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required><input type="date" id="epDate" value="${p.date}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required><select id="epMode" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><option ${p.mode==='Bank'?'selected':''}>Bank</option><option ${p.mode==='Cash'?'selected':''}>Cash</option></select><input id="epRemarks" value="${p.remarks||''}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Update</button></form>`; }
                 else if(t==='admin-settings') { 
                     const u = Auth.curr;
                     tit.innerText="Admin Settings"; 
-                    con.innerHTML=`<form onsubmit="Actions.updateAdminCreds(event)" class="space-y-4"><label class="block text-xs font-bold text-slate-500 uppercase">Change Username (Email)</label><input id="adminNewEmail" type="email" value="${u.email}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required><label class="block text-xs font-bold text-slate-500 uppercase mt-4">Change Password</label><input id="adminNewPass" type="password" placeholder="New Password" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><p class="text-xs text-slate-400">Leave password blank to keep current one.</p><button class="w-full bg-slate-800 text-white p-3 rounded-lg font-bold hover:bg-slate-700 transition mt-4">Update Credentials</button></form>`; 
+                    con.innerHTML=`<form onsubmit="Actions.updateAdminCreds(event)" class="space-y-4"><label class="block text-xs font-bold text-slate-500 uppercase">Change Username (Email)</label><input id="adminNewEmail" type="email" value="${u.email}" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none" required><label class="block text-xs font-bold text-slate-500 uppercase mt-4">Change Notification Email</label><input id="adminNotifyEmail" type="email" value="${u.notificationEmail || ''}" placeholder="alert@example.com" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><label class="block text-xs font-bold text-slate-500 uppercase mt-4">Change Password</label><input id="adminNewPass" type="password" placeholder="New Password" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none"><p class="text-xs text-slate-400">Leave password blank to keep current one.</p><button class="w-full bg-slate-800 text-white p-3 rounded-lg font-bold hover:bg-slate-700 transition mt-4">Update Credentials</button></form>`; 
                 }
-                // NEW: Increment Modal
                 else if(t==='increment') { 
-                    const u = DB.getUsers().find(x => x.id === id);
+                    const u = DB.getUsers().find(x => String(x.id) === String(id));
                     tit.innerText = "Give Salary Increment"; 
                     con.innerHTML = `
                         <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100 mb-4 text-xs text-yellow-700">
                             <strong>Note:</strong> Earnings until the "Effective Date" (at old salary) will be calculated and added to the Opening Balance. Future calculations will use the New Salary from this date.
                         </div>
-                        <form onsubmit="Actions.giveIncrement(event, ${id})" class="space-y-4">
+                        <form onsubmit="Actions.giveIncrement(event, '${id}')" class="space-y-4">
                             <div><label class="text-xs font-bold text-slate-500 uppercase">Current Salary</label><div class="p-3 bg-slate-100 rounded-lg text-slate-600 font-bold">₹${u.salary}</div></div>
                             <div><label class="text-xs font-bold text-slate-500 uppercase">New Salary</label><input id="incAmount" type="number" placeholder="Enter New Salary" class="w-full bg-white border border-slate-200 p-3 rounded-lg outline-none focus:border-indigo-500" required></div>
                             <div><label class="text-xs font-bold text-slate-500 uppercase">Effective From</label><input id="incDate" type="date" class="w-full bg-white border border-slate-200 p-3 rounded-lg outline-none focus:border-indigo-500" required></div>
@@ -628,9 +723,40 @@
             closeModal() { document.getElementById('modal').classList.add('hidden'); }
         };
 
+        const Notify = {
+            async alertAdmin(type, empName, details) {
+                const admin = DB.getUsers().find(u => u.role === 'admin');
+                if (!admin || !admin.notificationEmail) return;
+                this.send({
+                    to_email: admin.notificationEmail, to_name: "Admin", subject: `New ${type} Request from ${empName}`,
+                    message: `${empName} has requested ${type}.\n\nDetails: ${details}\n\nPlease log in to KARMIK HRMS to approve or reject.`
+                });
+            },
+            async alertEmployee(empId, type, status) {
+                const user = DB.getUsers().find(u => String(u.id) === String(empId));
+                if (!user || !user.notificationEmail) return;
+                this.send({
+                    to_email: user.notificationEmail, to_name: user.name, subject: `Request ${status}: ${type}`,
+                    message: `Your request for ${type} has been ${status} by the Admin.\n\nLogin to view details.`
+                });
+            },
+            async broadcastNotice(text) {
+                const users = DB.getUsers().filter(u => u.role !== 'admin' && u.notificationEmail);
+                users.forEach(user => {
+                    this.send({
+                        to_email: user.notificationEmail, to_name: user.name, subject: "New Notice Posted - KARMIK HRMS",
+                        message: `A new notice has been posted:\n\n"${text}"\n\nPlease log in to the portal to view the full details.`
+                    });
+                });
+            },
+            send(params) {
+                emailjs.send('service_4selhca', 'template_mqcw767', params).catch(e => console.log("Email error:", e));
+            }
+        };
+
         const Actions = {
-            async saveEmp(e) { e.preventDefault(); const ph = await Sec.hash("123"); DB.saveUser({id:Date.now(), name:document.getElementById('mName').value, email:document.getElementById('mEmail').value, password:ph, role:"employee", designation:document.getElementById('mRole').value, mobile:document.getElementById('mMobile').value, address:document.getElementById('mAddr').value, joinDate:document.getElementById('mJoin').value, salary:parseInt(document.getElementById('mSal').value), openingBalance:parseInt(document.getElementById('mOpen').value)||0, status:"Active", isDefaultPass:true}); UI.closeModal(); UI.renderPage('employees'); },
-            updEmp(e, id) { e.preventDefault(); const u=DB.getUsers().find(x=>x.id===id); u.name=document.getElementById('eName').value; u.email=document.getElementById('eEmail').value; u.designation=document.getElementById('eRole').value; u.mobile=document.getElementById('eMobile').value; u.address=document.getElementById('eAddr').value; u.joinDate=document.getElementById('eJoin').value; u.salary=parseInt(document.getElementById('eSal').value); u.openingBalance=parseInt(document.getElementById('eOpen').value)||0; DB.updateUser(u); UI.closeModal(); UI.renderPage('details', id); },
+            async saveEmp(e) { e.preventDefault(); const ph = await Sec.hash("123"); DB.saveUser({id:Date.now(), name:document.getElementById('mName').value, email:document.getElementById('mEmail').value, notificationEmail:document.getElementById('mNotifyEmail').value, password:ph, role:"employee", designation:document.getElementById('mRole').value, mobile:document.getElementById('mMobile').value, address:document.getElementById('mAddr').value, joinDate:document.getElementById('mJoin').value, salary:parseInt(document.getElementById('mSal').value), openingBalance:parseInt(document.getElementById('mOpen').value)||0, status:"Active", isDefaultPass:true}); UI.closeModal(); UI.renderPage('employees'); },
+            updEmp(e, id) { e.preventDefault(); const u=DB.getUsers().find(x=>String(x.id)===String(id)); u.name=document.getElementById('eName').value; u.email=document.getElementById('eEmail').value; u.notificationEmail=document.getElementById('eNotifyEmail').value; u.designation=document.getElementById('eRole').value; u.mobile=document.getElementById('eMobile').value; u.address=document.getElementById('eAddr').value; u.joinDate=document.getElementById('eJoin').value; u.salary=parseInt(document.getElementById('eSal').value); u.openingBalance=parseInt(document.getElementById('eOpen').value)||0; DB.updateUser(u); UI.closeModal(); UI.renderPage('details', id); },
             delEmp(id) { if(confirm("Permanently delete this employee and all data?")) { DB.deleteUser(id); UI.renderPage('employees'); } },
             
             addPay(e, id) { e.preventDefault(); DB.addPayment({id:Date.now(), empId:id, amount:parseInt(document.getElementById('payAmt').value), date:document.getElementById('payDate').value, mode:document.getElementById('payMode').value, remarks:document.getElementById('payRem').value}); UI.renderPage('details', id); },
@@ -640,80 +766,91 @@
             addLeave(e, id) { e.preventDefault(); const s=document.getElementById('lFrom').value, en=document.getElementById('lTo').value; const diff=Math.ceil(Math.abs(new Date(en)-new Date(s))/(8.64e7))+1; DB.addLeave({id:Date.now(), empId:id, startDate:s, endDate:en, type:document.getElementById('lType').value, reason:document.getElementById('lReason').value, days:diff}); UI.renderPage('details', id); },
             delLeave(lid, uid) { if(confirm("Delete leave?")) { DB.deleteLeave(lid); UI.renderPage('details', uid); } },
             
-            async procReq(id, act) { const r=await DB.updateRequest(id, act); if(act==='Approved') { if(r.type==='Advance') DB.addPayment({id:Date.now(), empId:r.empId, amount:r.amount, date:new Date().toISOString().split('T')[0], mode:'Advance', remarks:r.details}); else { const d=Math.ceil(Math.abs(new Date(r.to)-new Date(r.from))/(8.64e7))+1; DB.addLeave({id:Date.now(), empId:r.empId, startDate:r.from, endDate:r.to, type:r.subType, days:d}); } } UI.renderPage('requests'); UI.renderSidebar(); },
-            procExp(id, act) { DB.updateExpense(id, act); UI.renderPage('expenses'); UI.renderSidebar(); },
+            async procReq(id, act) { 
+                const r=await DB.updateRequest(id, act); 
+                if(act==='Approved') { 
+                    if(r.type==='Advance') DB.addPayment({id:Date.now(), empId:r.empId, amount:r.amount, date:new Date().toISOString().split('T')[0], mode:'Advance', remarks:r.details}); 
+                    else { const d=Math.ceil(Math.abs(new Date(r.to)-new Date(r.from))/(8.64e7))+1; DB.addLeave({id:Date.now(), empId:r.empId, startDate:r.from, endDate:r.to, type:r.subType, days:d}); } 
+                }
+                Notify.alertEmployee(r.empId, r.type, act); 
+                UI.renderPage('requests'); UI.renderSidebar(); 
+            },
+            procExp(id, act) { 
+                DB.updateExpense(id, act); 
+                const exp = DB.getExpenses().find(e => String(e.id) === String(id));
+                if(exp) Notify.alertEmployee(exp.empId, "Expense Claim", act);
+                UI.renderPage('expenses'); UI.renderSidebar(); 
+            },
             
-            submitExpense(e) { e.preventDefault(); const u = Auth.curr; DB.addExpense({ id: Date.now(), empId: u.id, empName: u.name, amount: parseInt(document.getElementById('expAmount').value), date: document.getElementById('expDate').value, reason: document.getElementById('expReason').value, status: 'Pending' }); alert("Claim Submitted"); UI.renderPage('my-expenses'); UI.renderSidebar(); },
-            submitRequest(e, type) { e.preventDefault(); const u = Auth.curr; let p = { id: Date.now(), empId: u.id, empName: u.name, type, status: 'Pending', date: new Date().toISOString().split('T')[0] }; if(type==='Leave'){ p.from=document.getElementById('reqLeaveFrom').value; p.to=document.getElementById('reqLeaveTo').value; p.subType=document.getElementById('reqLeaveType').value; p.details=`${p.subType}: ${document.getElementById('reqLeaveReason').value}`; p.days=Math.ceil(Math.abs(new Date(p.to)-new Date(p.from))/(8.64e7))+1; } else { p.amount=parseInt(document.getElementById('reqAdvAmount').value); p.details=document.getElementById('reqAdvReason').value; } DB.addRequest(p); alert("Submitted"); UI.renderPage('my-requests'); UI.renderSidebar(); },
+            submitExpense(e) { 
+                e.preventDefault(); const u = Auth.curr; const amt = parseInt(document.getElementById('expAmount').value); const rsn = document.getElementById('expReason').value;
+                DB.addExpense({ id: Date.now(), empId: u.id, empName: u.name, amount: amt, date: document.getElementById('expDate').value, reason: rsn, status: 'Pending' }); 
+                Notify.alertAdmin("Expense Claim", u.name, `Amount: ₹${amt}, Reason: ${rsn}`);
+                alert("Claim Submitted"); UI.renderPage('my-expenses'); UI.renderSidebar(); 
+            },
+            submitRequest(e, type) { 
+                e.preventDefault(); const u = Auth.curr; let p = { id: Date.now(), empId: u.id, empName: u.name, type, status: 'Pending', date: new Date().toISOString().split('T')[0] }; 
+                if(type==='Leave'){ p.from=document.getElementById('reqLeaveFrom').value; p.to=document.getElementById('reqLeaveTo').value; p.subType=document.getElementById('reqLeaveType').value; p.details=`${p.subType}: ${document.getElementById('reqLeaveReason').value}`; p.days=Math.ceil(Math.abs(new Date(p.to)-new Date(p.from))/(8.64e7))+1; } 
+                else { p.amount=parseInt(document.getElementById('reqAdvAmount').value); p.details=document.getElementById('reqAdvReason').value; } 
+                DB.addRequest(p); 
+                Notify.alertAdmin(type, u.name, p.details);
+                alert("Submitted"); UI.renderPage('my-requests'); UI.renderSidebar(); 
+            },
 
-            async adminPass(e, id) { e.preventDefault(); const u=DB.getUsers().find(x=>x.id===id); u.password=await Sec.hash(document.getElementById('newPassAdmin').value); u.isDefaultPass=true; DB.updateUser(u); UI.closeModal(); alert("Password Reset."); },
+            async adminPass(e, id) { e.preventDefault(); const u=DB.getUsers().find(x=>String(x.id)===String(id)); u.password=await Sec.hash(document.getElementById('newPassAdmin').value); u.isDefaultPass=true; DB.updateUser(u); UI.closeModal(); alert("Password Reset."); },
             async userPass(e) { e.preventDefault(); const u=Auth.curr; const oldH=await Sec.hash(document.getElementById('oldP').value); if(u.password!==oldH) return alert("Incorrect Password"); u.password=await Sec.hash(document.getElementById('newP').value); DB.updateUser(u); alert("Success! Please Login again."); Auth.logout(); },
             
             async updateAdminCreds(e) {
-                e.preventDefault();
-                const u = Auth.curr;
-                const newEmail = document.getElementById('adminNewEmail').value;
-                const newPass = document.getElementById('adminNewPass').value;
+                e.preventDefault(); const u = Auth.curr; const newEmail = document.getElementById('adminNewEmail').value; const newNotify = document.getElementById('adminNotifyEmail').value; const newPass = document.getElementById('adminNewPass').value;
                 if(newEmail) u.email = newEmail;
-                if(newPass) {
-                    if(newPass.length < 6) return alert("Password too short (min 6 chars)");
-                    u.password = await Sec.hash(newPass);
-                }
-                await DB.updateUser(u);
-                alert("Admin Credentials Updated! Please login again.");
-                Auth.logout();
+                if(newNotify) u.notificationEmail = newNotify;
+                if(newPass) { if(newPass.length < 6) return alert("Password too short (min 6 chars)"); u.password = await Sec.hash(newPass); }
+                await DB.updateUser(u); alert("Admin Credentials Updated! Please login again."); Auth.logout();
             },
             
-            // NEW: Logic to process Increment
             async giveIncrement(e, id) {
-                e.preventDefault();
-                const u = DB.getUsers().find(x => x.id === id);
-                
-                const newSal = parseInt(document.getElementById('incAmount').value);
-                const newDate = document.getElementById('incDate').value;
-                
-                // 1. Calculate past earnings for the current period (from oldStart to newDate)
+                e.preventDefault(); const u = DB.getUsers().find(x => String(x.id) === String(id));
+                const newSal = parseInt(document.getElementById('incAmount').value); const newDate = document.getElementById('incDate').value;
                 const oldStart = u.salaryDate || u.joinDate;
                 
-                // Helper: Calc Months between two past dates
-                const getMonths = (d1, d2) => {
-                    const s = new Date(d1); const e = new Date(d2);
-                    let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
-                    if (e.getDate() < s.getDate()) m--;
-                    return Math.max(0, m);
-                };
-
-                const cyclesPassed = getMonths(oldStart, newDate);
-                const frozenEarnings = cyclesPassed * u.salary;
+                const getMonths = (d1, d2) => { const s = new Date(d1); const e = new Date(d2); let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()); if (e.getDate() < s.getDate()) m--; return Math.max(0, m); };
+                const cyclesPassed = getMonths(oldStart, newDate); const frozenEarnings = cyclesPassed * u.salary;
                 
                 if(!confirm(`Confirm Action:\n\n1. Add ₹${frozenEarnings} to Past Earnings (Opening Balance)\n2. Change Salary to ₹${newSal}\n3. Set new calculation start date to ${newDate}`)) return;
 
-                // 2. Update User Data
-                u.openingBalance = (u.openingBalance || 0) + frozenEarnings;
-                u.salary = newSal;
-                u.salaryDate = newDate; // New calculation baseline
-
-                await DB.updateUser(u);
-                UI.closeModal();
-                UI.renderPage('details', id);
-                alert("Increment Applied Successfully!");
+                u.openingBalance = (u.openingBalance || 0) + frozenEarnings; u.salary = newSal; u.salaryDate = newDate;
+                await DB.updateUser(u); UI.closeModal(); UI.renderPage('details', id); alert("Increment Applied Successfully!");
             },
 
-            postNotice(e) { e.preventDefault(); DB.addNotice(document.getElementById('nText').value); UI.closeModal(); UI.renderPage('dashboard'); },
-            deleteNotice(id) { DB.deleteNotice(id); UI.renderPage('dashboard'); },
+            postNotice(e) { 
+                e.preventDefault(); const text = document.getElementById('nText').value; 
+                DB.addNotice(text).then(() => {
+                    Notify.broadcastNotice(text);
+                    UI.closeModal(); UI.renderPage('dashboard'); UI.renderSidebar(); 
+                });
+            },
+            deleteNotice(id) { 
+                if(confirm("Delete this notice?")) {
+                    DB.deleteNotice(id); 
+                    UI.renderPage(document.getElementById('page-title').innerText.toLowerCase().includes('notice') ? 'notices' : 'dashboard'); 
+                    UI.renderSidebar();
+                }
+            },
             resetSystem() { alert("Data wipe is disabled in Cloud Mode for security."); },
         };
+
+        // EXPOSE TO WINDOW FOR INLINE HTML CLICK HANDLERS
+        window.UI = UI;
+        window.Actions = Actions;
+        window.Notify = Notify;
+        window.DB = DB;
+        window.Auth = Auth;
     </script>
     
     <script>
-        // Register PWA Service Worker
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js');
-            });
+            window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
         }
     </script>
 </body>
 </html>
-
-
