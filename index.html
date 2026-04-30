@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+    <!-- EMAIL JS SDK -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script type="text/javascript">
         (function(){
@@ -145,7 +146,7 @@
             </header>
             <div id="content-area" class="flex-1 overflow-y-auto p-6 lg:p-8 relative pb-20 fade-in"></div>
             <footer class="border-t border-slate-200 bg-white text-slate-400 text-center py-3 text-[10px] w-full z-20">
-                Version 3.7 | © 2026 IRA Education
+                Version 3.9 | © 2026 IRA Education
             </footer>
         </main>
     </div>
@@ -176,8 +177,8 @@
             authDomain: "karmikhrsm-b9e9d.firebaseapp.com",
             projectId: "karmikhrsm-b9e9d",
             storageBucket: "karmikhrsm-b9e9d.appspot.com",
-            messagingSenderId: "31420433896", // Update if needed
-            appId: "1:31420433896:web:1a912491a8b140c051905d" // Update if needed
+            messagingSenderId: "31420433896", 
+            appId: "1:31420433896:web:1a912491a8b140c051905d" 
         };
 
         const app = initializeApp(firebaseConfig);
@@ -288,6 +289,12 @@
                 const ref = await addDoc(collection(db, "leaves"), l);
                 _leaveDocs[l.id] = ref.id;
             },
+            updateLeave: async (l) => {
+                const idx = _leaves.findIndex(x => String(x.id) === String(l.id));
+                if(idx > -1) _leaves[idx] = l;
+                const docId = _leaveDocs[l.id];
+                if(docId) await updateDoc(doc(db, "leaves", docId), l);
+            },
             deleteLeave: async (id) => { 
                 _leaves = _leaves.filter(x => String(x.id) !== String(id));
                 const docId = _leaveDocs[id];
@@ -376,10 +383,11 @@
                 r.readAsText(f);
             },
 
-            calcCycles: (startDate) => {
+            // UPDATED: Added exitDate logic to freeze cycle accumulation for inactive employees
+            calcCycles: (startDate, exitDate = null) => {
                 if(!startDate) return 0;
                 const p = startDate.split('-'); const jY=parseInt(p[0]), jM=parseInt(p[1])-1, jD=parseInt(p[2]);
-                const n = new Date();
+                const n = exitDate ? new Date(exitDate) : new Date();
                 let m = (n.getFullYear()-jY)*12 + (n.getMonth()-jM);
                 if(n.getDate() < jD) m--;
                 return Math.max(0, m);
@@ -472,8 +480,9 @@
                 const u = DB.getUsers().find(x => (x.email === e || x.email === 'demo') && x.password === pHash);
                 
                 if(u) { 
+                    if(u.status === 'Inactive') return alert("Your account has been deactivated. Please contact Admin.");
                     this.curr = u;
-                    localStorage.setItem('karmik_user', JSON.stringify(u)); // SAVE SESSION
+                    localStorage.setItem('karmik_user', JSON.stringify(u)); 
                     document.getElementById('login-screen').classList.add('hidden'); 
                     if (u.isDefaultPass && u.email !== 'demo') {
                         document.getElementById('force-change-modal').classList.remove('hidden');
@@ -497,7 +506,7 @@
                 u.isDefaultPass = false; 
                 await DB.updateUser(u);
                 
-                localStorage.setItem('karmik_user', JSON.stringify(u)); // UPDATE SESSION
+                localStorage.setItem('karmik_user', JSON.stringify(u)); 
 
                 document.getElementById('force-change-modal').classList.add('hidden');
                 document.getElementById('app-container').classList.remove('hidden'); 
@@ -506,7 +515,7 @@
             },
             logout() { 
                 this.curr=null; 
-                localStorage.removeItem('karmik_user'); // CLEAR SESSION
+                localStorage.removeItem('karmik_user'); 
                 location.reload(); 
             }
         };
@@ -528,7 +537,6 @@
             },
             handleNavClick(page) { if(window.innerWidth<1024) UI.toggleSidebar(); UI.renderPage(page); },
             
-            // NEW: Search Filter Logic fixed
             filterEmployees() {
                 const val = document.getElementById('searchInput').value.toLowerCase();
                 const cards = document.querySelectorAll('.emp-card');
@@ -578,13 +586,14 @@
                 document.getElementById('page-title').innerText = page.toUpperCase().replace('-',' ');
 
                 if(page === 'dashboard') {
-                    const users = DB.getUsers().filter(u => u.role !== 'admin');
+                    const allStaff = DB.getUsers().filter(u => u.role !== 'admin');
+                    const activeStaffCount = allStaff.filter(u => u.status === 'Active').length;
                     const reqCount = DB.getRequests().filter(r => r.status === 'Pending').length;
                     const expCount = DB.getExpenses().filter(e => e.status === 'Pending').length;
                     
                     let totalGen = 0;
-                    users.forEach(u => {
-                        const mw = DB.calcCycles(u.salaryDate || u.joinDate);
+                    allStaff.forEach(u => {
+                        const mw = DB.calcCycles(u.salaryDate || u.joinDate, u.status === 'Inactive' ? u.exitDate : null);
                         const ded = DB.calcDeductions(u.id, u.salary);
                         const earned = ((mw * u.salary) + (u.openingBalance || 0)) - ded;
                         totalGen += earned;
@@ -592,7 +601,7 @@
 
                     c.innerHTML = `
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><i class="fa-solid fa-users text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Total Staff</p><h3 class="text-2xl font-bold text-slate-800">${users.length}</h3></div></div>
+                            <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><i class="fa-solid fa-users text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Active Staff</p><h3 class="text-2xl font-bold text-slate-800">${activeStaffCount}</h3></div></div>
                             <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><i class="fa-solid fa-coins text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Lifetime Salary</p><h3 class="text-2xl font-bold text-slate-800">₹${totalGen.toLocaleString()}</h3></div></div>
                             <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600"><i class="fa-solid fa-bell text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Requests</p><h3 class="text-2xl font-bold text-slate-800">${reqCount}</h3></div></div>
                             <div class="card-premium p-6 rounded-xl flex items-center gap-4"><div class="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-600"><i class="fa-solid fa-receipt text-xl"></i></div><div><p class="text-xs text-slate-500 font-bold uppercase">Claims</p><h3 class="text-2xl font-bold text-slate-800">${expCount}</h3></div></div>
@@ -604,16 +613,15 @@
                     c.innerHTML = `
                         <div class="flex justify-between items-center mb-6"><h3 class="font-bold text-slate-800 text-lg">Staff Directory</h3><button onclick="UI.modal('add')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-md shadow-indigo-200 transition"><i class="fa-solid fa-plus mr-2"></i>Add Employee</button></div>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${users.map(u => {
-                            const mw = DB.calcCycles(u.salaryDate || u.joinDate);
+                            const mw = DB.calcCycles(u.salaryDate || u.joinDate, u.status === 'Inactive' ? u.exitDate : null);
                             const earned = ((mw * u.salary) + (u.openingBalance || 0)) - DB.calcDeductions(u.id, u.salary);
                             const paid = DB.getPayments(u.id).reduce((s,p)=>s+p.amount,0);
                             const bal = earned - paid;
-                            // FIXED: Added quotes around ${u.id} in onclick
-                            return `<div class="card-premium p-6 rounded-xl hover:shadow-lg transition group cursor-pointer emp-card" data-name="${u.name}" data-id="${u.id}" onclick="UI.renderPage('details', '${u.id}')"><div class="flex justify-between items-start mb-4"><div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold border border-slate-200">${(u.name||'U')[0].toUpperCase()}</div><div class="text-right"><p class="text-[10px] text-slate-400 uppercase font-bold">Next Credit</p><p class="text-xs text-indigo-600 font-bold">${DB.nextCredit(u.joinDate)}</p></div></div><h3 class="font-bold text-slate-800 text-lg truncate">${u.name}</h3><p class="text-slate-500 text-sm mb-5">${u.designation}</p><div class="flex gap-2">${bal>0 ? `<span class="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-orange-100 flex-1 text-center">Due: ₹${bal}</span>` : bal<0 ? `<span class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-100 flex-1 text-center">Adv: ₹${Math.abs(bal)}</span>` : `<span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-100 flex-1 text-center">Settled</span>`}</div></div>`
+                            const badge = u.status === 'Inactive' ? `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase ml-2 border border-rose-200 shadow-sm">Exited</span>` : '';
+                            return `<div class="card-premium p-6 rounded-xl hover:shadow-lg transition group cursor-pointer emp-card ${u.status==='Inactive'?'opacity-75':''}" data-name="${u.name}" data-id="${u.id}" onclick="UI.renderPage('details', '${u.id}')"><div class="flex justify-between items-start mb-4"><div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold border border-slate-200">${(u.name||'U')[0].toUpperCase()}</div><div class="text-right"><p class="text-[10px] text-slate-400 uppercase font-bold">Next Credit</p><p class="text-xs text-indigo-600 font-bold">${u.status==='Inactive'?'-':DB.nextCredit(u.joinDate)}</p></div></div><h3 class="font-bold text-slate-800 text-lg truncate flex items-center">${u.name} ${badge}</h3><p class="text-slate-500 text-sm mb-5">${u.designation}</p><div class="flex gap-2">${bal>0 ? `<span class="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-orange-100 flex-1 text-center">Due: ₹${bal}</span>` : bal<0 ? `<span class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-100 flex-1 text-center">Adv: ₹${Math.abs(bal)}</span>` : `<span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-100 flex-1 text-center">Settled</span>`}</div></div>`
                         }).join('')}</div>`;
                 }
                 else if(page === 'details' || page === 'profile') {
-                    // FIXED: Strict String matching for ID to prevent silent fails
                     const u = page==='profile' ? Auth.curr : DB.getUsers().find(x=> String(x.id) === String(id)); 
                     if(!u) { console.error("User not found", id); return alert("Error loading profile"); }
 
@@ -629,14 +637,14 @@
                             <p class="text-sm text-yellow-700 mt-1 ml-7">${latestNotice.text}</p>
                         </div>` : '';
 
-                    const mw = DB.calcCycles(u.salaryDate || u.joinDate);
+                    const mw = DB.calcCycles(u.salaryDate || u.joinDate, u.status === 'Inactive' ? u.exitDate : null);
                     const ded = DB.calcDeductions(u.id, u.salary);
                     const earned = ((mw * u.salary) + (u.openingBalance || 0)) - ded;
                     const paid = payments.reduce((s,p)=>s+p.amount,0); const bal = earned - paid;
                     const isAdmin = Auth.curr.role === 'admin';
                     let status = bal>0 ? `<div class="bg-orange-50 border border-orange-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-orange-600 uppercase font-bold">Net Due</p><p class="text-xl font-bold text-orange-700">₹${bal}</p></div>` : bal<0 ? `<div class="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-blue-600 uppercase font-bold">Advance</p><p class="text-xl font-bold text-blue-700">₹${Math.abs(bal)}</p></div>` : `<div class="bg-emerald-50 border border-emerald-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-emerald-600 uppercase font-bold">Status</p><p class="text-xl font-bold text-emerald-700">Settled</p></div>`;
 
-                    c.innerHTML = `<div class="max-w-6xl mx-auto">${noticeHtml}<div class="flex justify-between items-center mb-6 no-print"><div class="flex gap-2">${isAdmin ? `<button onclick="UI.renderPage('employees')" class="text-slate-500 hover:text-slate-800 text-sm font-medium flex items-center transition"><i class="fa-solid fa-arrow-left mr-2"></i> Back</button>` : ''}</div><div class="flex gap-2">${isAdmin ? `<button onclick="UI.modal('edit', '${u.id}')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-pen mr-1"></i> Edit</button><button onclick="UI.modal('increment', '${u.id}')" class="bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-arrow-trend-up mr-1"></i> Increment</button><button onclick="UI.modal('reset-pass', '${u.id}')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Reset Pass</button><button onclick="Actions.delEmp('${u.id}')" class="bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-trash mr-1"></i> Delete</button>` : `<button onclick="UI.modal('change-pass')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Change Pass</button>`}</div></div><div class="card-premium p-8 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-8"><div class="flex items-center gap-6 w-full md:w-auto"><div class="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl shadow-slate-200">${(u.name||'U')[0].toUpperCase()}</div><div><h1 class="text-2xl font-bold text-slate-900">${u.name}</h1><p class="text-slate-500 font-medium">${u.designation}</p><div class="text-xs text-slate-400 mt-2 flex gap-4"><span class="flex items-center"><i class="fa-regular fa-calendar mr-1.5"></i> Joined: ${u.joinDate}</span><span class="flex items-center"><i class="fa-solid fa-phone mr-1.5"></i> ${u.mobile}</span></div></div></div><div class="flex gap-4 flex-wrap justify-center w-full md:w-auto"><div class="bg-red-50 border border-red-100 p-4 rounded-xl text-center min-w-[100px]"><p class="text-xs text-red-600 font-bold uppercase">LWP Cut</p><p class="text-xl font-bold text-red-700">-₹${ded}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Earned</p><p class="text-xl font-bold text-slate-700">₹${earned}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Paid</p><p class="text-xl font-bold text-emerald-600">₹${paid}</p></div>${status}</div></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div class="lg:col-span-2 space-y-8"><div class="card-premium p-6 rounded-xl"><div class="flex justify-between items-center mb-6"><h3 class="font-bold text-slate-800">Payment History</h3><div class="flex gap-2 pdf-controls"><input type="date" id="pdfFrom" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><input type="date" id="pdfTo" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><button onclick="DB.genPDF('${u.id}')" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded text-xs font-medium transition shadow-sm">Download PDF</button></div></div><div class="overflow-auto max-h-96 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-slate-50 sticky top-0"><tr><th class="p-3 font-semibold">Date</th><th class="p-3 font-semibold">Mode</th><th class="p-3 font-semibold text-right">Amount</th><th class="p-3 w-10 no-print"></th></tr></thead><tbody class="divide-y divide-slate-100 text-slate-600">${payments.map(p=>`<tr class="hover:bg-slate-50 transition"><td class="p-3 text-xs">${p.date}</td><td class="p-3 text-xs"><span class="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">${p.mode}</span></td><td class="p-3 text-right font-mono font-bold text-slate-800">₹${p.amount}</td><td class="p-3 text-right no-print">${isAdmin?`<button onclick="UI.modal('edit-payment', '${p.id}')" class="text-indigo-500 hover:text-indigo-700 mr-3"><i class="fa-solid fa-pen"></i></button><button onclick="Actions.delPay('${p.id}', '${u.id}')" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div><div class="space-y-8">${isAdmin ? `<div class="card-premium p-6 rounded-xl bg-slate-50/50 no-print"><h4 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider">Quick Actions</h4><form onsubmit="Actions.addPay(event, '${u.id}')" class="space-y-3 mb-6 pb-6 border-b border-slate-200"><div class="grid grid-cols-2 gap-3"><input type="number" id="payAmt" placeholder="Amount" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="payDate" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required value="${new Date().toISOString().split('T')[0]}"></div><div class="grid grid-cols-2 gap-3"><select id="payMode" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option>Bank</option><option>Cash</option></select><input id="payRem" placeholder="Remarks" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"></div><button class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded text-sm font-medium transition shadow-md">Record Payment</button></form><div class="mb-6 pb-6 border-b border-slate-200"><form onsubmit="Actions.addLeave(event, '${u.id}')" class="space-y-3"><div class="grid grid-cols-2 gap-3"><input type="date" id="lFrom" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="lTo" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><select id="lType" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option value="Paid">Paid Leave</option><option value="LWP">LWP (Unpaid)</option></select><input id="lReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-2 rounded text-sm font-medium transition">Record Leave</button></form></div><div><label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Import Data</label><input type="file" onchange="DB.importCSV(this, '${u.id}')" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 transition"/></div></div>`:''}<div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4 text-sm">Leave History</h3><div class="overflow-auto max-h-60 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-white sticky top-0"><tr><th class="pb-2 font-semibold">Date</th><th class="pb-2 font-semibold">Days</th><th class="pb-2 font-semibold text-right">Type</th><th class="pb-2 w-8 no-print"></th></tr></thead><tbody class="text-slate-600">${leaves.map(l=>`<tr><td class="py-2 text-xs border-b border-slate-50">${l.startDate}<br><span class="text-slate-400">to</span> ${l.endDate}</td><td class="py-2 border-b border-slate-50 font-bold">${l.days}</td><td class="py-2 border-b border-slate-50 text-right"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.type==='LWP'?'bg-rose-50 text-rose-600 border border-rose-100':'bg-emerald-50 text-emerald-600 border border-emerald-100'}">${l.type}</span></td><td class="py-2 border-b border-slate-50 text-right no-print">${isAdmin?`<button onclick="Actions.delLeave('${l.id}','${u.id}')" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div></div></div>`;
+                    c.innerHTML = `<div class="max-w-6xl mx-auto">${noticeHtml}<div class="flex justify-between items-center mb-6 no-print"><div class="flex gap-2">${isAdmin ? `<button onclick="UI.renderPage('employees')" class="text-slate-500 hover:text-slate-800 text-sm font-medium flex items-center transition"><i class="fa-solid fa-arrow-left mr-2"></i> Back</button>` : ''}</div><div class="flex gap-2">${isAdmin ? `<button onclick="UI.modal('edit', '${u.id}')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-pen mr-1"></i> Edit</button><button onclick="UI.modal('increment', '${u.id}')" class="bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-arrow-trend-up mr-1"></i> Increment</button><button onclick="UI.modal('mark-exit', '${u.id}')" class="bg-orange-50 border border-orange-100 hover:bg-orange-100 text-orange-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-door-open mr-1"></i> ${u.status === 'Inactive' ? 'Re-Activate' : 'Mark Exit'}</button><button onclick="UI.modal('reset-pass', '${u.id}')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Reset Pass</button><button onclick="Actions.delEmp('${u.id}')" class="bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-trash mr-1"></i> Delete</button>` : `<button onclick="UI.modal('change-pass')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fa-solid fa-key mr-1"></i> Change Pass</button>`}</div></div><div class="card-premium p-8 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-8"><div class="flex items-center gap-6 w-full md:w-auto"><div class="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl shadow-slate-200">${(u.name||'U')[0].toUpperCase()}</div><div><h1 class="text-2xl font-bold text-slate-900 flex items-center">${u.name} ${u.status === 'Inactive' ? `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded text-xs font-bold uppercase ml-3 border border-rose-200">Exited</span>` : ''}</h1><p class="text-slate-500 font-medium">${u.designation}</p><div class="text-xs text-slate-400 mt-2 flex gap-4"><span class="flex items-center"><i class="fa-regular fa-calendar mr-1.5"></i> Joined: ${u.joinDate}</span> ${u.status === 'Inactive' ? `<span class="flex items-center text-rose-500 font-bold"><i class="fa-solid fa-door-closed mr-1.5"></i> Exited: ${u.exitDate}</span>` : ''} <span class="flex items-center"><i class="fa-solid fa-phone mr-1.5"></i> ${u.mobile}</span></div></div></div><div class="flex gap-4 flex-wrap justify-center w-full md:w-auto"><div class="bg-red-50 border border-red-100 p-4 rounded-xl text-center min-w-[100px]"><p class="text-xs text-red-600 font-bold uppercase">LWP Cut</p><p class="text-xl font-bold text-red-700">-₹${ded}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Earned</p><p class="text-xl font-bold text-slate-700">₹${earned}</p></div><div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-center min-w-[120px]"><p class="text-[10px] text-slate-400 font-bold uppercase">Paid</p><p class="text-xl font-bold text-emerald-600">₹${paid}</p></div>${status}</div></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div class="lg:col-span-2 space-y-8"><div class="card-premium p-6 rounded-xl"><div class="flex justify-between items-center mb-6"><h3 class="font-bold text-slate-800">Payment History</h3><div class="flex gap-2 pdf-controls"><input type="date" id="pdfFrom" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><input type="date" id="pdfTo" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-600 outline-none"><button onclick="DB.genPDF('${u.id}')" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded text-xs font-medium transition shadow-sm">Download PDF</button></div></div><div class="overflow-auto max-h-96 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-slate-50 sticky top-0"><tr><th class="p-3 font-semibold">Date</th><th class="p-3 font-semibold">Mode</th><th class="p-3 font-semibold text-right">Amount</th><th class="p-3 w-10 no-print"></th></tr></thead><tbody class="divide-y divide-slate-100 text-slate-600">${payments.map(p=>`<tr class="hover:bg-slate-50 transition"><td class="p-3 text-xs">${p.date}</td><td class="p-3 text-xs"><span class="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">${p.mode}</span></td><td class="p-3 text-right font-mono font-bold text-slate-800">₹${p.amount}</td><td class="p-3 text-right no-print">${isAdmin?`<button onclick="UI.modal('edit-payment', '${p.id}')" class="text-indigo-500 hover:text-indigo-700 mr-3"><i class="fa-solid fa-pen"></i></button><button onclick="Actions.delPay('${p.id}', '${u.id}')" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div><div class="space-y-8">${isAdmin ? `<div class="card-premium p-6 rounded-xl bg-slate-50/50 no-print"><h4 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider">Quick Actions</h4><form onsubmit="Actions.addPay(event, '${u.id}')" class="space-y-3 mb-6 pb-6 border-b border-slate-200"><div class="grid grid-cols-2 gap-3"><input type="number" id="payAmt" placeholder="Amount" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="payDate" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required value="${new Date().toISOString().split('T')[0]}"></div><div class="grid grid-cols-2 gap-3"><select id="payMode" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option>Bank</option><option>Cash</option></select><input id="payRem" placeholder="Remarks" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"></div><button class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded text-sm font-medium transition shadow-md">Record Payment</button></form><div class="mb-6 pb-6 border-b border-slate-200"><form onsubmit="Actions.addLeave(event, '${u.id}')" class="space-y-3"><div class="grid grid-cols-2 gap-3"><input type="date" id="lFrom" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="lTo" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><select id="lType" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition"><option value="Paid">Paid Leave</option><option value="LWP">LWP (Unpaid)</option></select><input id="lReason" placeholder="Reason" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-2 rounded text-sm font-medium transition">Record Leave</button></form></div><div><label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Import Data</label><input type="file" onchange="DB.importCSV(this, '${u.id}')" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 transition"/></div></div>`:''}<div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4 text-sm">Leave History</h3><div class="overflow-auto max-h-60 custom-scrollbar"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-400 uppercase bg-white sticky top-0"><tr><th class="pb-2 font-semibold">Date</th><th class="pb-2 font-semibold">Days</th><th class="pb-2 font-semibold text-right">Type</th><th class="pb-2 w-8 no-print"></th></tr></thead><tbody class="text-slate-600">${leaves.map(l=>`<tr><td class="py-2 text-xs border-b border-slate-50">${l.startDate}<br><span class="text-slate-400">to</span> ${l.endDate}</td><td class="py-2 border-b border-slate-50 font-bold">${l.days}</td><td class="py-2 border-b border-slate-50 text-right"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.type.includes('LWP')?'bg-rose-50 text-rose-600 border border-rose-100':'bg-emerald-50 text-emerald-600 border border-emerald-100'}">${l.type}</span></td><td class="py-2 border-b border-slate-50 text-right no-print">${isAdmin?`<button onclick="Actions.delLeave('${l.id}','${u.id}')" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}</tbody></table></div></div></div></div></div>`;
                 }
                 else if(page==='requests'){
                     const r = DB.getRequests().filter(x=>x.status==='Pending');
@@ -662,31 +670,6 @@
                 else if(page==='my-expenses'){
                     const u = Auth.curr; const e = DB.getExpenses().filter(x=>String(x.empId)===String(u.id)).reverse();
                     c.innerHTML=`<div class="max-w-3xl mx-auto"><div class="card-premium p-6 rounded-xl mb-8"><h3 class="font-bold text-slate-800 mb-4">Submit Claim</h3><form onsubmit="Actions.submitExpense(event)" class="space-y-4"><div class="grid grid-cols-2 gap-4"><input type="number" id="expAmount" placeholder="Amount (₹)" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><input type="date" id="expDate" class="bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required></div><input type="text" id="expReason" placeholder="Description (e.g. Travel, Office Supplies)" class="w-full bg-white border border-slate-200 rounded p-2 text-sm outline-none focus:border-indigo-500 transition" required><button class="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition">Submit Claim</button></form></div><div class="card-premium p-6 rounded-xl"><h3 class="font-bold text-slate-800 mb-4">My Claims</h3><div class="space-y-3">${e.length===0?'<p class="text-slate-400 text-sm">No claims found.</p>':e.map(x=>`<div class="bg-white border border-slate-200 p-4 rounded-lg flex justify-between items-center text-sm"><div><p class="font-bold text-slate-700">${x.reason}</p><p class="text-xs text-gray-500">${x.date}</p><p class="text-blue-600 font-bold">₹${x.amount}</p></div><span class="px-2 py-1 rounded text-xs font-bold ${x.status==='Pending'?'bg-yellow-100 text-yellow-800':x.status==='Paid'?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${x.status}</span></div>`).join('')}</div></div></div>`;
-                }
-                else if(page === 'notices') {
-                    const notices = DB.getNotices();
-                    if(notices.length > 0) {
-                        localStorage.setItem(`lastSeenNotice_${Auth.curr.id}`, notices[0].id);
-                        UI.renderSidebar(); 
-                    }
-                    c.innerHTML = `
-                        <div class="max-w-4xl mx-auto">
-                            <h3 class="text-slate-800 font-bold text-xl mb-6">Notice Board</h3>
-                            ${notices.length === 0 ? 
-                                '<div class="card-premium p-12 text-center text-slate-400 rounded-xl">No notices posted yet.</div>' : 
-                                `<div class="space-y-4">
-                                    ${notices.map(n => `
-                                        <div class="card-premium p-6 rounded-xl border-l-4 border-indigo-500 bg-white">
-                                            <div class="flex justify-between items-start mb-2">
-                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">${n.date}</span>
-                                                ${u.role === 'admin' ? `<button onclick="Actions.deleteNotice('${n.id}')" class="text-rose-400 hover:text-rose-600"><i class="fa-solid fa-trash text-xs"></i></button>` : ''}
-                                            </div>
-                                            <p class="text-slate-700 leading-relaxed">${n.text}</p>
-                                        </div>
-                                    `).join('')}
-                                </div>`
-                            }
-                        </div>`;
                 }
             },
             
@@ -718,6 +701,31 @@
                             <div><label class="text-xs font-bold text-slate-500 uppercase">Effective From</label><input id="incDate" type="date" class="w-full bg-white border border-slate-200 p-3 rounded-lg outline-none focus:border-indigo-500" required></div>
                             <button class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-md">Update Salary Structure</button>
                         </form>`; 
+                }
+                // NEW: Mark Exit / Reactivate Modal
+                else if(t==='mark-exit') {
+                    const u = DB.getUsers().find(x => String(x.id) === String(id));
+                    if(u.status === 'Inactive') {
+                        tit.innerText = "Re-Activate Employee";
+                        con.innerHTML = `
+                            <div class="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4 text-xs text-blue-700">
+                                Employee will resume earning salary from the Reactivation Date.
+                            </div>
+                            <form onsubmit="Actions.reactivateEmp(event, '${id}')" class="space-y-4">
+                                <div><label class="text-xs font-bold text-slate-500 uppercase">Reactivation Date</label><input id="rejoinDate" type="date" class="w-full bg-white border border-slate-200 p-3 rounded-lg outline-none focus:border-indigo-500" required value="${new Date().toISOString().split('T')[0]}"></div>
+                                <button class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition shadow-md">Re-Activate Employee</button>
+                            </form>`;
+                    } else {
+                        tit.innerText = "Mark Employee Exit";
+                        con.innerHTML = `
+                            <div class="bg-orange-50 p-3 rounded-lg border border-orange-100 mb-4 text-xs text-orange-700">
+                                This will safely freeze their lifetime earnings and stop future accumulation. They will not be able to log in.
+                            </div>
+                            <form onsubmit="Actions.markExit(event, '${id}')" class="space-y-4">
+                                <div><label class="text-xs font-bold text-slate-500 uppercase">Exit Date</label><input id="exitDate" type="date" class="w-full bg-white border border-slate-200 p-3 rounded-lg outline-none focus:border-indigo-500" required value="${new Date().toISOString().split('T')[0]}"></div>
+                                <button class="w-full bg-orange-600 text-white p-3 rounded-lg font-bold hover:bg-orange-700 transition shadow-md">Confirm Exit</button>
+                            </form>`;
+                    }
                 }
             },
             closeModal() { document.getElementById('modal').classList.add('hidden'); }
@@ -809,17 +817,89 @@
             },
             
             async giveIncrement(e, id) {
-                e.preventDefault(); const u = DB.getUsers().find(x => String(x.id) === String(id));
-                const newSal = parseInt(document.getElementById('incAmount').value); const newDate = document.getElementById('incDate').value;
+                e.preventDefault(); 
+                const u = DB.getUsers().find(x => String(x.id) === String(id));
+                const newSal = parseInt(document.getElementById('incAmount').value); 
+                const newDate = document.getElementById('incDate').value;
                 const oldStart = u.salaryDate || u.joinDate;
+                const oldSal = u.salary;
                 
                 const getMonths = (d1, d2) => { const s = new Date(d1); const e = new Date(d2); let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()); if (e.getDate() < s.getDate()) m--; return Math.max(0, m); };
-                const cyclesPassed = getMonths(oldStart, newDate); const frozenEarnings = cyclesPassed * u.salary;
+                const cyclesPassed = getMonths(oldStart, newDate); 
+                const grossEarnings = cyclesPassed * oldSal;
                 
-                if(!confirm(`Confirm Action:\n\n1. Add ₹${frozenEarnings} to Past Earnings (Opening Balance)\n2. Change Salary to ₹${newSal}\n3. Set new calculation start date to ${newDate}`)) return;
+                // Past LWP logic
+                const pastLeaves = DB.getLeaves(u.id).filter(l => l.type === 'LWP' && new Date(l.startDate) < new Date(newDate));
+                const pastLwpDays = pastLeaves.reduce((sum, l) => sum + parseInt(l.days), 0);
+                const pastLwpDeduction = Math.round(pastLwpDays * (oldSal / 30));
+                
+                const netEarnings = grossEarnings - pastLwpDeduction;
+                
+                if(!confirm(`Confirm Increment:\n\n1. Lock in ₹${netEarnings} to Past Earnings (₹${grossEarnings} Salary - ₹${pastLwpDeduction} for past LWP)\n2. Archive ${pastLwpDays} past LWP days\n3. Set new salary to ₹${newSal}\n4. Set new start date to ${newDate}`)) return;
 
-                u.openingBalance = (u.openingBalance || 0) + frozenEarnings; u.salary = newSal; u.salaryDate = newDate;
-                await DB.updateUser(u); UI.closeModal(); UI.renderPage('details', id); alert("Increment Applied Successfully!");
+                u.openingBalance = (u.openingBalance || 0) + netEarnings; 
+                u.salary = newSal; 
+                u.salaryDate = newDate;
+                await window.DB.updateUser(u); 
+                
+                for(let l of pastLeaves) {
+                    l.type = 'LWP (Settled)';
+                    await window.DB.updateLeave(l);
+                }
+
+                UI.closeModal(); UI.renderPage('details', id); alert("Increment Applied Successfully!");
+            },
+
+            // NEW: Logic for Marking an Exit
+            async markExit(e, id) {
+                e.preventDefault();
+                const u = DB.getUsers().find(x => String(x.id) === String(id));
+                const exitDate = document.getElementById('exitDate').value;
+                
+                if(!confirm("Are you sure? This will freeze their earnings as of the exit date.")) return;
+
+                u.status = 'Inactive';
+                u.exitDate = exitDate;
+                await window.DB.updateUser(u);
+                
+                UI.closeModal(); UI.renderPage('details', id); alert("Employee has been successfully offboarded.");
+            },
+
+            // NEW: Logic for Reactivating an Exited Employee
+            async reactivateEmp(e, id) {
+                e.preventDefault();
+                const u = DB.getUsers().find(x => String(x.id) === String(id));
+                const rejoinDate = document.getElementById('rejoinDate').value;
+
+                // 1. Lock in ALL previous earnings up to their original exit date
+                const oldStart = u.salaryDate || u.joinDate;
+                const cyclesPassed = DB.calcCycles(oldStart, u.exitDate); 
+                const grossEarnings = cyclesPassed * u.salary;
+
+                // 2. Lock in all LWP taken before they exited
+                const pastLeaves = DB.getLeaves(u.id).filter(l => l.type === 'LWP' && new Date(l.startDate) <= new Date(u.exitDate));
+                const pastLwpDays = pastLeaves.reduce((sum, l) => sum + parseInt(l.days), 0);
+                const pastLwpDeduction = Math.round(pastLwpDays * (u.salary / 30));
+
+                const netEarnings = grossEarnings - pastLwpDeduction;
+
+                if(!confirm(`Reactivate this employee?\nThis will lock ₹${netEarnings} into their lifetime earnings so they do not get paid for the time they were away.`)) return;
+
+                u.openingBalance = (u.openingBalance || 0) + netEarnings;
+                
+                // 3. Mark old LWP as settled
+                for(let l of pastLeaves) {
+                    l.type = 'LWP (Settled)';
+                    await window.DB.updateLeave(l);
+                }
+
+                // 4. Reactivate and reset the salary start clock to today
+                u.status = 'Active';
+                u.salaryDate = rejoinDate;
+                u.exitDate = null;
+                await window.DB.updateUser(u);
+
+                UI.closeModal(); UI.renderPage('details', id); alert("Employee Reactivated!");
             },
 
             postNotice(e) { 
